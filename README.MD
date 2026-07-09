@@ -1,4 +1,4 @@
-# Infrastructure Historian
+# CortexOPS
 
 An AI agent that manages its own CockroachDB cluster — and remembers, semantically, why it made every decision.
 
