@@ -6,3 +6,7 @@ go-agent/go.sum
 frontend/node_modules/
 frontend/dist/
 .DS_Store
+cockroach-v*
+cockroach
+go-agent/.env
+node-orchestrator/.env
