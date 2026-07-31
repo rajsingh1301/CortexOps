@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS decisions (
     action_type        STRING NOT NULL,          -- e.g. 'backup', 'scale_up', 'no_action', 'schema_review'
     trigger_source     STRING,                    -- e.g. 'scheduled', 'cpu_alert', 'manual'
     reasoning_text     STRING NOT NULL,           -- human-readable "why" — this is what gets embedded
-    embedding          VECTOR(1536),               -- Bedrock Titan embedding of reasoning_text
+    embedding          VECTOR(1024),               -- Cohere embedding of reasoning_text
     confidence         FLOAT,                      -- 0.0–1.0, model's self-reported confidence
     mcp_context        JSONB,                      -- snapshot of cluster state that informed this decision
     skills_consulted   STRING[],                   -- names of Agent Skills consulted, e.g. {'performance-and-scaling'}

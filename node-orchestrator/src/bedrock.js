@@ -11,6 +11,7 @@
 // each easy to test and easy to swap models independently later.
 
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import crypto from "crypto";
 
 const client = new BedrockRuntimeClient({ region: process.env.AWS_REGION || "us-east-1" });
 
@@ -27,6 +28,25 @@ const EMBEDDING_MODEL_ID = process.env.BEDROCK_EMBEDDING_MODEL_ID; // e.g. amazo
  * @param {object[]} params.similarPastDecisions - top-k similar decisions, for continuity
  */
 export async function reason({ mcpContext, relevantSkills, similarPastDecisions }) {
+  if (process.env.USE_MOCK_BEDROCK === "true") {
+    console.log("Using Mock Bedrock for reasoning");
+    const cpu = mcpContext?.cpu_percent || 0;
+    if (cpu > 70) {
+      return {
+        actionType: "scale_up",
+        reasoningText: `Mock reasoning: CPU usage is high at ${cpu}%. Recommending scaling up cluster per performance-and-scaling skill guidance.`,
+        confidence: 0.9,
+        ccloudCommand: "ccloud cluster scale --nodes +1 --cluster infra-historian-demo"
+      };
+    }
+    return {
+      actionType: "no_action",
+      reasoningText: "Mock reasoning: Routine health check shows normal CPU and active query levels. No scaling or maintenance actions required.",
+      confidence: 0.95,
+      ccloudCommand: null
+    };
+  }
+
   const skillsText = relevantSkills
     .map((s) => `### Skill: ${s.name}\n${s.body}`)
     .join("\n\n");
@@ -83,13 +103,54 @@ Respond ONLY with a JSON object, no other text, in this exact shape:
  * matches whatever embedding model id you actually use).
  */
 export async function embed(text) {
+  if (process.env.USE_MOCK_BEDROCK === "true") {
+    const isCohere = EMBEDDING_MODEL_ID?.startsWith("cohere");
+    const dimension = isCohere ? 1024 : 1536;
+    
+    // Deterministic LCG based on SHA-256 hash of text
+    const hash = crypto.createHash("sha256").update(text).digest();
+    let seed = hash.readUInt32LE(0) || 1;
+    const lcg = () => {
+      seed = (1103515245 * seed + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    
+    const vector = [];
+    for (let i = 0; i < dimension; i++) {
+      vector.push(lcg() * 2 - 1);
+    }
+    const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+    return vector.map(val => val / magnitude);
+  }
+
+  const isCohere = EMBEDDING_MODEL_ID.startsWith("cohere");
+  const bodyPayload = isCohere
+    ? { texts: [text], input_type: "search_document" }
+    : { inputText: text };
+
   const command = new InvokeModelCommand({
     modelId: EMBEDDING_MODEL_ID,
     contentType: "application/json",
-    body: JSON.stringify({ inputText: text }),
+    body: JSON.stringify(bodyPayload),
   });
 
-  const response = await client.send(command);
-  const body = JSON.parse(new TextDecoder().decode(response.body));
-  return body.embedding; // number[]
+  let retries = 5;
+  let delay = 2000;
+  while (retries > 0) {
+    try {
+      const response = await client.send(command);
+      const body = JSON.parse(new TextDecoder().decode(response.body));
+      return isCohere ? body.embeddings[0] : body.embedding; // number[]
+    } catch (err) {
+      if (err.name === 'ThrottlingException' || err.$metadata?.httpStatusCode === 429) {
+        console.warn(`Bedrock rate limit hit, retrying in ${delay}ms... (${retries} retries left)`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        retries--;
+        delay *= 2; // exponential backoff
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error("Failed to get embedding from Bedrock after multiple retries due to throttling.");
 }

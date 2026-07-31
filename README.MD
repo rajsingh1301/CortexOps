@@ -4,7 +4,7 @@ An AI agent that manages its own CockroachDB cluster — and remembers, semantic
 
 Built for the CockroachDB × AWS Hackathon (Build with Agentic Memory).
 
-## The idea
+## The Idea
 
 Most "agent + database" hackathon projects use the database as a passive memory store for
 some unrelated product. This project is deliberately self-referential: the agent's job is
@@ -13,47 +13,64 @@ Skills), and every decision it makes — and the reasoning behind it — is embe
 back in that same cluster. Ask it "why did you take a backup on Tuesday" and it retrieves
 the actual reasoning, not a guess.
 
-## CockroachDB tools used
+## CockroachDB Tools Used
 
 | Tool | Role |
 |---|---|
 | **Managed MCP Server** | Read-only introspection — cluster health, query stats, contention — before any decision is made |
 | **Agent Skills Repo** | The agent's operating procedure — consulted before every consequential action |
-| **ccloud CLI** | The agent's "hands" — provisions backups, checks health, (later) scaling actions |
+| **ccloud CLI** | The agent's "hands" — provisions backups, checks health, scaling actions |
 | **Distributed Vector Indexing** | The decision journal — semantic search over the agent's own operational history |
 
-## AWS services used
+## AWS Services Used
 
 | Service | Role |
 |---|---|
-| **Bedrock** | Reasoning (decide what to do) + embeddings (for the journal) |
-| **Lambda** | Scheduled trigger for the observe→reason→log loop |
+| **Bedrock** | Reasoning (Claude 3.5 Sonnet) + Embeddings (Cohere embed-english-v3) |
+| **Lambda** | Scheduled trigger for the observe → reason → log loop |
 | **CloudWatch** | Optional external signal correlation |
 
-## Repo layout
+## Repo Layout
 
 ```
-cortexOps/ (root)
+cortexOps/
 ├── db/
-│   ├── schema.sql        # CockroachDB schema (decisions, command log, skill invocations, snapshots)
-│   └── seed.sql          # Sample rows for local testing before real embeddings exist
-├── go-agent/             # Go service: MCP client + ccloud wrapper + skill loader
+│   ├── schema.sql           # CockroachDB schema (decisions, command log, skill invocations, snapshots)
+│   └── seed.sql             # Sample rows for local testing
+├── go-agent/                # Go service: MCP client + ccloud wrapper + skill loader (port 5005)
 │   ├── main.go
-│   ├── mcp/client.go
-│   ├── ccloud/wrapper.go
-│   ├── skills/loader.go
-│   └── decisions/store.go
-├── node-orchestrator/     # Node.js: Bedrock calls + orchestration + API for the dashboard
+│   ├── main_test.go         # Safety whitelist unit tests
+│   ├── mcp/client.go        # CockroachDB Managed MCP Server client (Bearer auth)
+│   ├── ccloud/wrapper.go    # Whitelisted ccloud CLI actions (backup, scale_up, schema_review, no_action)
+│   ├── skills/loader.go     # Agent Skills YAML loader
+│   └── decisions/store.go   # CockroachDB vector decision storage
+├── node-orchestrator/       # Node.js: Bedrock calls + orchestration + API (port 4000)
 │   └── src/
-│       ├── index.js
-│       ├── bedrock.js
-│       └── db.js
-├── frontend/              # React dashboard (built in Week 3)
-└── docs/
-    └── architecture.md
+│       ├── index.js         # Express API (POST /reason, GET /decisions, approve/reject, /search)
+│       ├── bedrock.js       # AWS Bedrock SDK (Claude reasoning + Cohere embeddings)
+│       └── db.js            # CockroachDB pg client + vector similarity search
+├── frontend/                # React dashboard (port 5173)
+│   └── src/
+│       ├── App.jsx          # Main app with tabs (Decision Feed, Memory Search)
+│       └── components/
+│           ├── ClusterMetrics.jsx   # Live cluster health indicators
+│           ├── DecisionCard.jsx     # AI decision cards with Approve/Reject
+│           └── MemorySearch.jsx     # "Why did you...?" vector search
+├── docs/
+│   └── architecture.md
+├── start.sh                 # One-command launcher for all 3 services
+└── todo.md                  # Implementation progress tracker
 ```
 
-## Setup (Week 1, Day 1-2 — Priority 0)
+## Quick Start
+
+### One-Command Launch
+```bash
+./start.sh
+```
+This starts all 3 services — go-agent (:5005), node-orchestrator (:4000), frontend (:5173).
+
+### Manual Setup
 
 1. **CockroachDB Cloud**
    ```bash
@@ -62,36 +79,93 @@ cortexOps/ (root)
    # Generate a service-account API key with read-only scope for MCP
    ```
 
-2. **ccloud CLI**
+2. **Database Schema**
+   ```bash
+   cockroach sql --url "$COCKROACH_CONN_STRING" -f db/schema.sql
+   cockroach sql --url "$COCKROACH_CONN_STRING" -f db/seed.sql
+   ```
+
+3. **ccloud CLI**
    ```bash
    curl -sSL https://binaries.cockroachdb.com/ccloud/install.sh | sh
    ccloud auth login
    ccloud cluster list   # sanity check
    ```
 
-3. **CockroachDB Agent Skills**
+4. **CockroachDB Agent Skills**
    ```bash
    npx skills add cockroachlabs/cockroachdb-skills
    ```
 
-4. **AWS Bedrock**
+5. **AWS Bedrock**
    ```bash
-   # In AWS Console: Bedrock > Model access > request access to an Anthropic Claude model
-   # and a Titan (or Cohere) embeddings model. Approval can take a few hours — do this first.
+   # In AWS Console: Bedrock > Model access > request access to Claude 3.5 Sonnet
+   # and Cohere embed-english-v3. Approval can take a few hours.
    aws configure   # set your credentials/region
    ```
 
-5. **Environment variables** — copy `.env.example` to `.env` in both `go-agent/` and
+6. **Environment Variables** — copy `.env.example` to `.env` in both `go-agent/` and
    `node-orchestrator/` and fill in:
    - `COCKROACH_CONN_STRING`
    - `COCKROACH_MCP_ENDPOINT` / `COCKROACH_MCP_API_KEY`
    - `AWS_REGION`, `BEDROCK_MODEL_ID`, `BEDROCK_EMBEDDING_MODEL_ID`
+   - Set `USE_MOCK_BEDROCK=true` for offline local development
 
-## Build order (see full 30-day plan)
+7. **Start Services**
+   ```bash
+   # Terminal 1 — Node Orchestrator
+   cd node-orchestrator && npm install && npm run dev
 
-1. `db/schema.sql` — run this against your cluster first
-2. `db/seed.sql` — seed a few rows, confirm vector search works
-3. `go-agent` — MCP read + skill loading (no writes yet)
-4. `node-orchestrator` — Bedrock reasoning + embedding + writing to `decisions`
-5. `go-agent/ccloud` — the write path, gated by human approval
-6. `frontend` — dashboard
+   # Terminal 2 — Go Agent
+   cd go-agent && export $(grep -v '^#' .env | xargs) && go run .
+
+   # Terminal 3 — Frontend
+   cd frontend && npm install && npm run dev
+   ```
+
+8. **Open Dashboard**: http://localhost:5173
+
+## Architecture
+
+```
+[Scheduled Trigger / Lambda]
+       │
+       ▼
+[go-agent :5005] ──MCP (read)──▶ [CockroachDB Cloud: Managed MCP Server]
+       │
+       ├──loads──▶ [Agent Skills (YAML)]
+       │
+       ├──POST /reason──▶ [node-orchestrator :4000] ──Bedrock──▶ [Claude 3.5 Sonnet + Cohere]
+       │                         │
+       ▼                         ▼
+[decisions.Store] ◀───── writes row (mcp_context, skills, embedding VECTOR(1024))
+       │
+       ▼
+[CockroachDB: decisions, cluster_snapshots, skill_invocations]
+       ▲
+       │
+[React Dashboard :5173] ◀──REST── [node-orchestrator API]
+       │
+       ├──Approve──▶ node-orchestrator ──▶ go-agent /execute ──▶ ccloud CLI (whitelist-gated)
+       └──"Why did you...?"──▶ Vector cosine similarity search ──▶ Past reasoning retrieval
+```
+
+## Safety Design
+
+Every executable action is gated by a strict `switch-case` whitelist in `go-agent/main.go`:
+- `backup` → `ccloud backup create`
+- `scale_up` → `ccloud cluster scale`
+- `schema_review` → `ccloud cluster describe` (read-only)
+- `no_action` → Audit log record (no-op)
+
+Any action not in this list is rejected with `HTTP 400 Bad Request`. The LLM never constructs shell commands directly.
+
+## Running Tests
+
+```bash
+cd go-agent && go test -v ./...
+```
+
+## License
+
+Built for the CockroachDB × AWS Hackathon 2026.

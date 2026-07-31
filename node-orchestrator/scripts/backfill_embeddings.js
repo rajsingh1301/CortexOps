@@ -24,12 +24,16 @@ async function main() {
 
   for (const row of rows) {
     const vector = await embed(row.reasoning_text);
+    const vectorStr = `[${vector.join(",")}]`;
     await pool.query(`UPDATE decisions SET embedding = $2 WHERE id = $1`, [
       row.id,
-      vector,
+      vectorStr,
     ]);
     console.log(`  done: ${row.id}`);
+    // Sleep to avoid AWS Bedrock ThrottlingException
+    await new Promise((resolve) => setTimeout(resolve, 1500));
   }
+
 
   console.log("backfill complete. Sanity check with:");
   console.log(`  SELECT action_type, reasoning_text FROM decisions

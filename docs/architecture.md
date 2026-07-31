@@ -59,13 +59,14 @@ place (`go-agent`), which is the safety property judges will look for.
       |--Approve click--> node-orchestrator --> go-agent /execute --> ccloud CLI
 ```
 
-## Open decisions to make early (Week 1)
+## Resolved Design Decisions
 
-- [ ] Confirm the Bedrock embedding model's actual output dimension and
-      update `VECTOR(1536)` in `db/schema.sql` if it differs.
-- [ ] Decide: does `go-agent` run as a long-lived HTTP server, or a
-      one-shot binary invoked by Lambda per tick? (One-shot is simpler
-      for the hackathon; HTTP server is needed if Node needs to call
-      `/execute` back into it — probably need the HTTP server.)
-- [ ] Decide where `skills-repo/` actually lives relative to `go-agent`
-      (a git submodule, or `npx skills add` output copied in at build time).
+- [x] Confirmed Cohere embedding model output dimension = **1024**.
+      Updated `VECTOR(1024)` in `db/schema.sql`.
+- [x] `go-agent` runs as a **long-lived HTTP server** on `:5005` —
+      needed for `node-orchestrator` to call `/execute` back into it
+      on human approval.
+- [x] Skills loaded from local `./skills-repo` directory at startup
+      via `skills/loader.go` YAML parser. Graceful fallback if
+      directory missing.
+

@@ -1,30 +1,156 @@
 // Infrastructure Historian — Go agent service.
-//
-// Responsibilities (deliberately NOT including LLM reasoning — that lives
-// in node-orchestrator, which calls this service over HTTP, or this
-// service could shell out to it; see docs/architecture.md for the exact
-// call direction you choose):
-//   1. Observe: pull cluster state via mcp.Client (read-only)
-//   2. Consult: find relevant Agent Skills via skills.Loader
-//   3. Record: write decisions/skill invocations to CockroachDB
-//   4. Act (gated): execute approved actions via ccloud.Wrapper
-//
-// This file wires the pieces together as a single runnable binary for
-// local development. In Week 4 this becomes the target invoked by a
-// scheduled AWS Lambda (via a Go Lambda handler — see cmd/lambda/ once
-// you add it).
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"time"
 
-	"github.com/yourname/infra-historian/go-agent/ccloud"
-	"github.com/yourname/infra-historian/go-agent/decisions"
-	"github.com/yourname/infra-historian/go-agent/mcp"
-	"github.com/yourname/infra-historian/go-agent/skills"
+	"github.com/rajsingh1301/CortexOps/go-agent/ccloud"
+	"github.com/rajsingh1301/CortexOps/go-agent/decisions"
+	"github.com/rajsingh1301/CortexOps/go-agent/mcp"
+	"github.com/rajsingh1301/CortexOps/go-agent/skills"
 )
+
+type SkillPayload struct {
+	Name string `json:"name"`
+	Body string `json:"body"`
+}
+
+type ReasonRequest struct {
+	MCPContext     map[string]interface{} `json:"mcpContext"`
+	RelevantSkills []SkillPayload         `json:"relevantSkills"`
+	Situation      string                 `json:"situation"`
+}
+
+type ReasonResponse struct {
+	ActionType    string    `json:"actionType"`
+	ReasoningText string    `json:"reasoningText"`
+	Embedding     []float32 `json:"embedding"`
+	Confidence    float64   `json:"confidence"`
+	CcloudCommand *string   `json:"ccloudCommand"`
+}
+
+type ExecuteRequest struct {
+	DecisionID string `json:"decisionId"`
+	ActionType string `json:"actionType"`
+}
+
+// callReasonEndpoint sends the cluster state & skills to node-orchestrator's /reason route.
+func callReasonEndpoint(orchestratorURL string, reqPayload ReasonRequest) (*ReasonResponse, error) {
+	bodyBytes, err := json.Marshal(reqPayload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal reason request: %w", err)
+	}
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	url := fmt.Sprintf("%s/reason", orchestratorURL)
+	resp, err := client.Post(url, "application/json", bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to POST to /reason at %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read /reason response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("orchestrator /reason returned HTTP %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var reasonResp ReasonResponse
+	if err := json.Unmarshal(respBody, &reasonResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal /reason JSON response: %w", err)
+	}
+
+	return &reasonResp, nil
+}
+
+// runObserveReasonCycle executes the observe -> consult -> reason -> record loop.
+func runObserveReasonCycle(ctx context.Context, mcpClient *mcp.Client, skillLoader *skills.Loader, store *decisions.Store, orchestratorURL string) {
+	log.Println("--- Starting Observe → Reason → Record cycle ---")
+
+	// 1. Observe
+	snapshot, err := mcpClient.GetClusterHealth(ctx)
+	if err != nil {
+		log.Printf("[Error] MCP observe failed: %v", err)
+		return
+	}
+	log.Printf("Observed cluster state: cpu=%.1f%% active_queries=%d", snapshot.CPUPercent, snapshot.ActiveQueries)
+
+	// 2. Consult skills
+	situation := "checking routine cluster health"
+	if snapshot.CPUPercent > 70 {
+		situation = "cpu spike investigation"
+	}
+	relevant := skillLoader.FindRelevant(situation)
+	log.Printf("Found %d relevant skill(s) for situation %q", len(relevant), situation)
+
+	skillPayloads := make([]SkillPayload, 0, len(relevant))
+	skillNames := make([]string, 0, len(relevant))
+	for _, s := range relevant {
+		skillPayloads = append(skillPayloads, SkillPayload{Name: s.Name, Body: s.Body})
+		skillNames = append(skillNames, s.Name)
+	}
+
+	// 3. Reason via node-orchestrator
+	reasonReq := ReasonRequest{
+		MCPContext: map[string]interface{}{
+			"cpu_percent":        snapshot.CPUPercent,
+			"active_queries":     snapshot.ActiveQueries,
+			"contention_events":  snapshot.ContentionEvents,
+			"replication_status": snapshot.ReplicationStatus,
+			"raw":                snapshot.Raw,
+		},
+		RelevantSkills: skillPayloads,
+		Situation:      situation,
+	}
+
+	reasonResp, err := callReasonEndpoint(orchestratorURL, reasonReq)
+	if err != nil {
+		log.Printf("[Error] Reasoning call failed: %v. Skipping decision recording for this cycle.", err)
+		return
+	}
+
+	log.Printf("Received AI decision: actionType=%s confidence=%.2f", reasonResp.ActionType, reasonResp.Confidence)
+
+	// 4. Record to CockroachDB with status='proposed'
+	mcpJSON, _ := snapshot.ToJSON()
+	ccloudCmd := ""
+	if reasonResp.CcloudCommand != nil {
+		ccloudCmd = *reasonResp.CcloudCommand
+	}
+
+	id, err := store.RecordDecision(ctx, decisions.Decision{
+		ActionType:      reasonResp.ActionType,
+		TriggerSource:   "scheduled_run",
+		ReasoningText:   reasonResp.ReasoningText,
+		Embedding:       reasonResp.Embedding,
+		Confidence:      reasonResp.Confidence,
+		MCPContext:      mcpJSON,
+		SkillsConsulted: skillNames,
+		CcloudCommand:   ccloudCmd,
+		Status:          "proposed",
+	})
+
+	if err != nil {
+		log.Printf("[Error] Recording decision failed: %v", err)
+		return
+	}
+
+	log.Printf("Successfully recorded decision %s in DB with status 'proposed'", id)
+}
 
 func main() {
 	ctx := context.Background()
@@ -34,10 +160,12 @@ func main() {
 	mcpAPIKey := mustEnv("COCKROACH_MCP_API_KEY")
 	clusterName := mustEnv("CCLOUD_CLUSTER_NAME")
 	skillsRepoPath := envOr("SKILLS_REPO_PATH", "./skills-repo")
+	orchestratorURL := envOr("NODE_ORCHESTRATOR_URL", "http://localhost:4000")
+	port := envOr("GO_AGENT_PORT", "5005")
 
 	store, err := decisions.NewStore(ctx, connString)
 	if err != nil {
-		log.Fatalf("store: %v", err)
+		log.Fatalf("Store connection error: %v", err)
 	}
 	defer store.Close()
 
@@ -45,69 +173,101 @@ func main() {
 
 	skillLoader := skills.NewLoader(skillsRepoPath)
 	if err := skillLoader.LoadAll(); err != nil {
-		log.Fatalf("loading skills: %v", err)
+		log.Printf("Warning loading skills from %s: %v", skillsRepoPath, err)
 	}
 
-	// dryRun=true until you've manually verified CreateBackup once —
-	// flip via CCLOUD_DRY_RUN=false when you're ready for Week 3.
 	dryRun := envOr("CCLOUD_DRY_RUN", "true") == "true"
 	ccloudWrapper := ccloud.NewWrapper(clusterName, dryRun)
 
-	// --- Step 1: Observe ---
-	snapshot, err := mcpClient.GetClusterHealth(ctx)
-	if err != nil {
-		log.Fatalf("mcp: %v", err)
+	// Trigger initial cycle immediately, then repeat every 5 minutes
+	observeInterval := envOr("OBSERVE_INTERVAL_SECONDS", "300")
+	intervalSec := 300
+	if parsed, err := time.ParseDuration(observeInterval + "s"); err == nil {
+		intervalSec = int(parsed.Seconds())
 	}
-	log.Printf("observed cluster state: cpu=%.1f%% active_queries=%d",
-		snapshot.CPUPercent, snapshot.ActiveQueries)
+	go func() {
+		// Run immediately on startup
+		runObserveReasonCycle(ctx, mcpClient, skillLoader, store, orchestratorURL)
 
-	// --- Step 2: Consult skills ---
-	situation := "checking routine cluster health"
-	if snapshot.CPUPercent > 70 {
-		situation = "cpu spike investigation"
-	}
-	relevant := skillLoader.FindRelevant(situation)
-	log.Printf("found %d relevant skill(s) for situation %q", len(relevant), situation)
+		ticker := time.NewTicker(time.Duration(intervalSec) * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				log.Printf("--- Periodic re-observe tick (every %ds) ---", intervalSec)
+				runObserveReasonCycle(ctx, mcpClient, skillLoader, store, orchestratorURL)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
-	// --- Step 3: Record (reasoning normally comes from node-orchestrator
-	// calling Bedrock; this is a placeholder until that call is wired in) ---
-	mcpJSON, _ := snapshot.ToJSON()
-	skillNames := []string{}
-	for _, s := range relevant {
-		skillNames = append(skillNames, s.Name)
-	}
+	// Setup HTTP server for execution triggers
+	mux := http.NewServeMux()
 
-	id, err := store.RecordDecision(ctx, decisions.Decision{
-		ActionType:      "no_action",
-		TriggerSource:   "manual_run",
-		ReasoningText:   "Placeholder reasoning — replace with Bedrock output from node-orchestrator. See README Week 2.",
-		Embedding:       nil, // filled in once node-orchestrator computes it
-		Confidence:      0.5,
-		MCPContext:      mcpJSON,
-		SkillsConsulted: skillNames,
-		Status:          "proposed",
+	// POST /execute — safety-critical gated endpoint
+	mux.HandleFunc("/execute", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req ExecuteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid JSON request body"}`, http.StatusBadRequest)
+			return
+		}
+
+		log.Printf("Received execution request: decisionId=%s actionType=%s", req.DecisionID, req.ActionType)
+
+		var result *ccloud.CommandResult
+		var execErr error
+
+		// Strict Whitelist Safety Gate (explicit switch-case)
+		switch req.ActionType {
+		case "backup":
+			result, execErr = ccloudWrapper.CreateBackup(r.Context())
+		case "scale_up":
+			result, execErr = ccloudWrapper.ScaleUp(r.Context(), 1)
+		case "schema_review":
+			result, execErr = ccloudWrapper.SchemaReview(r.Context())
+		case "no_action":
+			result, execErr = ccloudWrapper.NoAction(r.Context())
+		default:
+			log.Printf("[Rejected] Action type %q is not in the execution whitelist!", req.ActionType)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": fmt.Sprintf("actionType '%s' rejected by safety whitelist", req.ActionType),
+			})
+			return
+		}
+
+		if execErr != nil {
+			log.Printf("[Error] Execution failed for actionType %s: %v", req.ActionType, execErr)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": execErr.Error(),
+			})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(result)
 	})
-	if err != nil {
-		log.Fatalf("recording decision: %v", err)
-	}
-	log.Printf("recorded decision %s", id)
 
-	// --- Step 4: Act (only if a human has approved via the dashboard) ---
-	// Left commented out deliberately — wire this up in Week 3 once the
-	// approval flow exists. Uncomment to test CreateBackup manually:
-	//
-	// result, err := ccloudWrapper.CreateBackup(ctx)
-	// if err != nil {
-	// 	log.Fatalf("ccloud: %v", err)
-	// }
-	// log.Printf("ccloud result: %+v", result)
-	_ = ccloudWrapper
+	log.Printf("go-agent server listening on :%s (ccloud dryRun=%v)...", port, dryRun)
+	if err := http.ListenAndServe(":"+port, mux); err != nil {
+		log.Fatalf("HTTP server failed: %v", err)
+	}
 }
 
 func mustEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("missing required env var: %s", key)
+		log.Fatalf("Missing required env var: %s", key)
 	}
 	return v
 }

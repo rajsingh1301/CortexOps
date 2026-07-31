@@ -5,6 +5,7 @@ package decisions
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -44,6 +45,15 @@ func (s *Store) Close() {
 // this before invoking this method) — this package doesn't call Bedrock
 // itself to keep the Go service focused on CockroachDB + ccloud + MCP.
 func (s *Store) RecordDecision(ctx context.Context, d Decision) (uuid.UUID, error) {
+	var embedStr interface{} = nil
+	if len(d.Embedding) > 0 {
+		var strVals []string
+		for _, v := range d.Embedding {
+			strVals = append(strVals, fmt.Sprintf("%g", v))
+		}
+		embedStr = fmt.Sprintf("[%s]", strings.Join(strVals, ","))
+	}
+
 	var id uuid.UUID
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO decisions
@@ -51,7 +61,7 @@ func (s *Store) RecordDecision(ctx context.Context, d Decision) (uuid.UUID, erro
 			 mcp_context, skills_consulted, ccloud_command, status)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'proposed')
 		RETURNING id
-	`, d.ActionType, d.TriggerSource, d.ReasoningText, d.Embedding, d.Confidence,
+	`, d.ActionType, d.TriggerSource, d.ReasoningText, embedStr, d.Confidence,
 		d.MCPContext, d.SkillsConsulted, d.CcloudCommand).Scan(&id)
 
 	if err != nil {

@@ -34,12 +34,15 @@ export async function listDecisions({ status, limit = 50 } = {}) {
 }
 
 export async function similarDecisions(queryEmbedding, limit = 5) {
+  const vectorStr = Array.isArray(queryEmbedding)
+    ? `[${queryEmbedding.join(",")}]`
+    : queryEmbedding;
   const { rows } = await pool.query(
     `SELECT id, action_type, reasoning_text, confidence, ccloud_command, status, outcome, created_at
      FROM decisions
      ORDER BY embedding <-> $1
      LIMIT $2`,
-    [queryEmbedding, limit]
+    [vectorStr, limit]
   );
   return rows;
 }
@@ -61,3 +64,26 @@ export async function recordOutcome(id, outcome) {
   );
   return rows[0];
 }
+
+export async function getDecisionById(id) {
+  const { rows } = await pool.query(
+    `SELECT id, action_type, trigger_source, reasoning_text, confidence,
+            ccloud_command, status, outcome, created_at, resolved_at
+     FROM decisions
+     WHERE id = $1`,
+    [id]
+  );
+  return rows[0];
+}
+
+export async function getLatestSnapshot() {
+  const { rows } = await pool.query(
+    `SELECT id, cpu_percent, active_queries, contention_events, replication_status, raw_mcp_response, captured_at
+     FROM cluster_snapshots
+     ORDER BY captured_at DESC
+     LIMIT 1`
+  );
+  return rows[0];
+}
+
+
