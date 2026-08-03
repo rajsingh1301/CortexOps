@@ -67,10 +67,24 @@ System Roadmap & Progress Tracker for **CortexOps (Infrastructure Historian)**.
 ---
 
 ### Phase 3: Production Readiness & Deployment
-- [ ] **AWS Lambda Scheduled Trigger**
-  - Package `go-agent` loop for scheduled execution via AWS Lambda or cron timer.
-- [ ] **CloudWatch Monitoring Integration**
-  - Configure CloudWatch logs/alerts for execution failures or critical CPU spikes.
+- [x] **AWS Lambda Scheduled Trigger**
+  - Extracted shared observe-reason logic into `go-agent/core/cycle.go` (`RunObserveReasonCycle`, `CallReasonEndpoint`, shared types).
+  - Refactored `go-agent/main.go` to import from `core/` package (HTTP server mode unchanged).
+  - Created `go-agent/cmd/lambda/main.go` — Lambda handler using `aws-lambda-go` SDK, runs one observe cycle per EventBridge invocation.
+  - Created `go-agent/template.yaml` — AWS SAM template with EventBridge `rate(5 minutes)` schedule, arm64, 256MB, 60s timeout.
+  - Created `go-agent/Makefile` — `make build-lambda`, `make deploy`, `make test`.
+  - Lambda binary cross-compiled: `bootstrap` (14MB, ELF ARM aarch64, statically linked).
+  - All 7 unit tests pass, HTTP server build verified.
+- [x] **CloudWatch Monitoring Integration**
+  - Created `go-agent/monitoring/cloudwatch.go` — custom metrics publisher (`CycleStatus`, `CPUPercent`, `ActiveQueries`, `DecisionConfidence`).
+  - Integrated into `core/cycle.go` with nil-safe `publishMetrics()` helper — publishes after each observe cycle.
+  - Lambda handler initializes `monitoring.NewMonitor(ctx)` for live AWS CloudWatch publishing.
+  - HTTP server mode passes `nil` monitor (metrics logged locally instead).
+  - Added IAM `CloudWatchPutMetricPolicy` to SAM template Lambda role.
+  - Added 2 CloudWatch Alarms to `template.yaml`:
+    - `cortexops-cycle-failure` — fires when cycle failures exceed threshold in 15 minutes.
+    - `cortexops-cpu-spike` — fires when cluster CPU exceeds 80% for 2 consecutive periods.
+  - All 7 unit tests pass, HTTP server + Lambda binaries compile successfully.
 - [x] **Module Cleanup**
   - Updated Go module import path in `go.mod` from `github.com/yourname/infra-historian/go-agent` to `github.com/rajsingh1301/CortexOps/go-agent`.
   - Updated all import paths in `main.go`, `main_test.go`. Build & tests pass.

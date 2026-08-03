@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/rajsingh1301/CortexOps/go-agent/ccloud"
+	"github.com/rajsingh1301/CortexOps/go-agent/core"
 )
 
 func TestExecuteWhitelistSafetyGate(t *testing.T) {
@@ -19,7 +20,7 @@ func TestExecuteWhitelistSafetyGate(t *testing.T) {
 			return
 		}
 
-		var req ExecuteRequest
+		var req core.ExecuteRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"invalid JSON request body"}`, http.StatusBadRequest)
 			return
@@ -100,7 +101,7 @@ func TestExecuteWhitelistSafetyGate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			payload := ExecuteRequest{
+			payload := core.ExecuteRequest{
 				DecisionID: "test-uuid-1234",
 				ActionType: tt.actionType,
 			}

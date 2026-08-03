@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  CortexOps — AI-powered CockroachDB cluster management agent.
+  Scheduled Lambda that runs the observe → reason → record cycle
+  with CloudWatch custom metrics and alarms.
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 256
+
+Resources:
+  CortexOpsObserveFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      FunctionName: cortexops-observe
+      Description: Runs one CortexOps observe → reason → record cycle
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      CodeUri: .
+      Policies:
+        - CloudWatchPutMetricPolicy: {}
+      Environment:
+        Variables:
+          COCKROACH_CONN_STRING: !Ref CockroachConnString
+          COCKROACH_MCP_ENDPOINT: !Ref CockroachMCPEndpoint
+          COCKROACH_MCP_API_KEY: !Ref CockroachMCPAPIKey
+          CCLOUD_CLUSTER_NAME: !Ref CCloudClusterName
+          NODE_ORCHESTRATOR_URL: !Ref NodeOrchestratorURL
+          SKILLS_REPO_PATH: ./skills-repo
+      Events:
+        ScheduledObserve:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Name: cortexops-observe-schedule
+            Description: Trigger CortexOps observe cycle every 5 minutes
+            Enabled: true
+
+  # CloudWatch Alarm: fires when cycle failures exceed threshold
+  CycleFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: cortexops-cycle-failure
+      AlarmDescription: >
+        Fires when CortexOps observe cycle failures exceed 2 in 15 minutes.
+        Investigate Lambda logs and node-orchestrator connectivity.
+      Namespace: CortexOps
+      MetricName: CycleStatus
+      Statistic: Sum
+      Period: 900
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanOrEqualToThreshold
+      TreatMissingData: breaching
+
+  # CloudWatch Alarm: fires when cluster CPU is critically high
+  CPUSpikeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: cortexops-cpu-spike
+      AlarmDescription: >
+        Fires when CockroachDB cluster CPU exceeds 80% as reported by MCP.
+        Agent should already be proposing scale_up — this alarm is a safety net.
+      Namespace: CortexOps
+      MetricName: CPUPercent
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+Parameters:
+  CockroachConnString:
+    Type: String
+    Description: CockroachDB connection string
+    NoEcho: true
+  CockroachMCPEndpoint:
+    Type: String
+    Description: CockroachDB Managed MCP Server endpoint
+    Default: https://cockroachlabs.cloud/mcp
+  CockroachMCPAPIKey:
+    Type: String
+    Description: CockroachDB MCP service-account API key
+    NoEcho: true
+  CCloudClusterName:
+    Type: String
+    Description: CockroachDB Cloud cluster name
+    Default: infra-historian-demo
+  NodeOrchestratorURL:
+    Type: String
+    Description: URL of the node-orchestrator service (e.g. ECS/EC2 endpoint)
+
+Outputs:
+  CortexOpsObserveFunctionArn:
+    Description: ARN of the CortexOps observe Lambda function
+    Value: !GetAtt CortexOpsObserveFunction.Arn
+  ScheduleRuleName:
+    Description: EventBridge schedule rule name
+    Value: cortexops-observe-schedule
+  CycleFailureAlarmArn:
+    Description: ARN of the cycle failure CloudWatch alarm
+    Value: !GetAtt CycleFailureAlarm.Arn
+  CPUSpikeAlarmArn:
+    Description: ARN of the CPU spike CloudWatch alarm
+    Value: !GetAtt CPUSpikeAlarm.Arn

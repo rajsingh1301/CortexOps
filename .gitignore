@@ -10,3 +10,6 @@ cockroach-v*
 cockroach
 go-agent/.env
 node-orchestrator/.env
+go-agent/go-agent
+bootstrap
+.aws-sam/
