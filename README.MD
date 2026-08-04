@@ -40,6 +40,11 @@ cortexOps/
 ├── go-agent/                # Go service: MCP client + ccloud wrapper + skill loader (port 5005)
 │   ├── main.go
 │   ├── main_test.go         # Safety whitelist unit tests
+│   ├── cmd/
+│   │   ├── cortexops/       # CLI Tool binary source (status, queue, approve, reject, ask)
+│   │   └── lambda/          # AWS Lambda handler entrypoint
+│   ├── core/                # Shared observe-reason cycle logic
+│   ├── monitoring/          # CloudWatch custom metrics publisher
 │   ├── mcp/client.go        # CockroachDB Managed MCP Server client (Bearer auth)
 │   ├── ccloud/wrapper.go    # Whitelisted ccloud CLI actions (backup, scale_up, schema_review, no_action)
 │   ├── skills/loader.go     # Agent Skills YAML loader
@@ -70,65 +75,47 @@ cortexOps/
 ```
 This starts all 3 services — go-agent (:5005), node-orchestrator (:4000), frontend (:5173).
 
-### Manual Setup
+---
 
-1. **CockroachDB Cloud**
-   ```bash
-   # Sign up at cockroachlabs.cloud, create a free-tier serverless cluster
-   # Enable the Managed MCP Server for the cluster from the Cloud Console
-   # Generate a service-account API key with read-only scope for MCP
-   ```
+## 💻 `cortexops` CLI Tool
 
-2. **Database Schema**
-   ```bash
-   cockroach sql --url "$COCKROACH_CONN_STRING" -f db/schema.sql
-   cockroach sql --url "$COCKROACH_CONN_STRING" -f db/seed.sql
-   ```
+In addition to the React Web Dashboard, CortexOps includes a standalone Go CLI tool (`cortexops`) for terminal-first SREs and DBAs.
 
-3. **ccloud CLI**
-   ```bash
-   curl -sSL https://binaries.cockroachdb.com/ccloud/install.sh | sh
-   ccloud auth login
-   ccloud cluster list   # sanity check
-   ```
+### Building the CLI
+```bash
+cd go-agent
+make build-cli
+# Or directly: go build -o cortexops ./cmd/cortexops/
+```
 
-4. **CockroachDB Agent Skills**
-   ```bash
-   npx skills add cockroachlabs/cockroachdb-skills
-   ```
+### CLI Subcommands
 
-5. **AWS Bedrock**
-   ```bash
-   # In AWS Console: Bedrock > Model access > request access to Claude 3.5 Sonnet
-   # and Cohere embed-english-v3. Approval can take a few hours.
-   aws configure   # set your credentials/region
-   ```
+```bash
+# 1. Inspect live cluster metrics & safety gate status
+./cortexops status
 
-6. **Environment Variables** — copy `.env.example` to `.env` in both `go-agent/` and
-   `node-orchestrator/` and fill in:
-   - `COCKROACH_CONN_STRING`
-   - `COCKROACH_MCP_ENDPOINT` / `COCKROACH_MCP_API_KEY`
-   - `AWS_REGION`, `BEDROCK_MODEL_ID`, `BEDROCK_EMBEDDING_MODEL_ID`
-   - Set `USE_MOCK_BEDROCK=true` for offline local development
+# 2. View pending approval queue
+./cortexops queue
 
-7. **Start Services**
-   ```bash
-   # Terminal 1 — Node Orchestrator
-   cd node-orchestrator && npm install && npm run dev
+# 3. Approve & execute a proposed decision
+./cortexops approve <decision_id>
 
-   # Terminal 2 — Go Agent
-   cd go-agent && export $(grep -v '^#' .env | xargs) && go run .
+# 4. Reject a proposed decision
+./cortexops reject <decision_id>
 
-   # Terminal 3 — Frontend
-   cd frontend && npm install && npm run dev
-   ```
+# 5. Natural language vector search over operational memory
+./cortexops ask "why did you take a backup?"
 
-8. **Open Dashboard**: http://localhost:5173
+# 6. Show CLI version and connected API endpoint
+./cortexops version
+```
+
+---
 
 ## Architecture
 
 ```
-[Scheduled Trigger / Lambda]
+[Scheduled Trigger / Lambda / EventBridge]
        │
        ▼
 [go-agent :5005] ──MCP (read)──▶ [CockroachDB Cloud: Managed MCP Server]
@@ -142,12 +129,13 @@ This starts all 3 services — go-agent (:5005), node-orchestrator (:4000), fron
        │
        ▼
 [CockroachDB: decisions, cluster_snapshots, skill_invocations]
-       ▲
-       │
-[React Dashboard :5173] ◀──REST── [node-orchestrator API]
-       │
-       ├──Approve──▶ node-orchestrator ──▶ go-agent /execute ──▶ ccloud CLI (whitelist-gated)
-       └──"Why did you...?"──▶ Vector cosine similarity search ──▶ Past reasoning retrieval
+       ▲                                               ▲
+       │                                               │
+[React Dashboard :5173]                  [cortexops CLI Tool]
+       │                                               │
+       └──REST API (:4000) ────────────────────────────┘
+              │
+              └──Approve──▶ node-orchestrator ──▶ go-agent /execute ──▶ ccloud CLI (whitelist-gated)
 ```
 
 ## Safety Design

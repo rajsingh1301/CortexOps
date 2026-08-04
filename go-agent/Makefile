@@ -1,10 +1,15 @@
 # CortexOps Go Agent — Build Commands
 
-.PHONY: build test run build-lambda deploy clean
+.PHONY: build test run build-lambda build-cli deploy clean
 
 # Build HTTP server mode (local dev)
 build:
 	go build -v -o go-agent .
+
+# Build CLI tool
+build-cli:
+	go build -v -o cortexops ./cmd/cortexops/
+	@echo "✅ CLI binary built: ./cortexops"
 
 # Run all tests
 test:
@@ -26,5 +31,5 @@ deploy: build-lambda
 
 # Clean build artifacts
 clean:
-	rm -f go-agent bootstrap
+	rm -f go-agent bootstrap cortexops
 	rm -rf .aws-sam/

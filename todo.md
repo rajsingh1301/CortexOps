@@ -92,10 +92,15 @@ System Roadmap & Progress Tracker for **CortexOps (Infrastructure Historian)**.
 ---
 
 ### Polish & Hackathon Readiness
+- [x] **Standalone `cortexops` CLI Tool**
+  - Built `go-agent/cmd/cortexops/main.go` supporting `status`, `queue`, `approve`, `reject`, `ask`, and `version` subcommands.
+  - Added `make build-cli` target to `go-agent/Makefile`.
+  - Added colored ANSI status box, approval queue table, vector search formatting, and live approval/rejection execution.
+  - Updated `README.MD` and `.gitignore`.
 - [x] **One-Command Launcher (`start.sh`)**
   - Created root-level `start.sh` script starting all 3 services with colorful output and `Ctrl+C` cleanup.
 - [x] **README Rewrite**
-  - Added Quick Start, frontend setup, architecture diagram, safety design section, and test instructions.
+  - Added Quick Start, frontend setup, CLI documentation, architecture diagram, safety design section, and test instructions.
 - [x] **Architecture Doc Cleanup**
   - Marked all resolved design decisions as `[x]` in `docs/architecture.md`.
 - [x] **Periodic Re-Observe Cycle**
