@@ -41,7 +41,7 @@ cortexOps/
 │   ├── main.go
 │   ├── main_test.go         # Safety whitelist unit tests
 │   ├── cmd/
-│   │   ├── cortexops/       # CLI Tool binary source (status, queue, approve, reject, ask)
+│   │   ├── cortexops/       # Production TUI CLI (Cobra, Viper, Lipgloss, Huh, Spinner)
 │   │   └── lambda/          # AWS Lambda handler entrypoint
 │   ├── core/                # Shared observe-reason cycle logic
 │   ├── monitoring/          # CloudWatch custom metrics publisher
@@ -77,9 +77,9 @@ This starts all 3 services — go-agent (:5005), node-orchestrator (:4000), fron
 
 ---
 
-## 💻 `cortexops` CLI Tool
+## 💻 `cortexops` TUI CLI Tool
 
-In addition to the React Web Dashboard, CortexOps includes a standalone Go CLI tool (`cortexops`) for terminal-first SREs and DBAs.
+CortexOps includes a production-grade Command-Line Interface (`cortexops`) built with **Cobra**, **Viper**, **Lipgloss**, **Huh**, and **Spinner**.
 
 ### Building the CLI
 ```bash
@@ -88,25 +88,42 @@ make build-cli
 # Or directly: go build -o cortexops ./cmd/cortexops/
 ```
 
-### CLI Subcommands
+### CLI Subcommands & Examples
 
 ```bash
-# 1. Inspect live cluster metrics & safety gate status
+# 1. Inspect live cluster health (styled Lipgloss TUI box)
+./cortexops cluster get-health
 ./cortexops status
+./cortexops status --output json
 
-# 2. View pending approval queue
-./cortexops queue
+# 2. View pending approval queue (styled Lipgloss TUI table)
+./cortexops decision list
+./cortexops queue --limit 3
+./cortexops decision list --output json
 
-# 3. Approve & execute a proposed decision
-./cortexops approve <decision_id>
+# 3. Approve & execute a proposed decision (interactive prompt if ID omitted)
+./cortexops decision approve a625baf7-1361-47a1-b468-75c0b9e18c10
+./cortexops approve    # Opens interactive Huh selection menu!
 
-# 4. Reject a proposed decision
-./cortexops reject <decision_id>
+# 4. Reject a proposed decision (interactive prompt if ID omitted)
+./cortexops decision reject 372463d1-462f-46a6-96b4-8d91e2b0df19
+./cortexops reject     # Opens interactive Huh selection menu!
 
 # 5. Natural language vector search over operational memory
-./cortexops ask "why did you take a backup?"
+./cortexops memory search "why did you take a backup?"
+./cortexops ask        # Opens interactive Huh input prompt!
 
-# 6. Show CLI version and connected API endpoint
+# 6. Persistent configuration management (~/.cortexops/config.yaml via Viper)
+./cortexops config view
+./cortexops config set api_url http://localhost:4000
+./cortexops config set default_limit 10
+
+# 7. Shell autocompletion script generator
+./cortexops completion zsh
+./cortexops completion bash
+./cortexops completion fish
+
+# 8. Version information
 ./cortexops version
 ```
 

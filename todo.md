@@ -92,15 +92,19 @@ System Roadmap & Progress Tracker for **CortexOps (Infrastructure Historian)**.
 ---
 
 ### Polish & Hackathon Readiness
-- [x] **Standalone `cortexops` CLI Tool**
-  - Built `go-agent/cmd/cortexops/main.go` supporting `status`, `queue`, `approve`, `reject`, `ask`, and `version` subcommands.
-  - Added `make build-cli` target to `go-agent/Makefile`.
-  - Added colored ANSI status box, approval queue table, vector search formatting, and live approval/rejection execution.
-  - Updated `README.MD` and `.gitignore`.
+- [x] **Production TUI CLI Makeover (`cortexops`)**
+  - Migrated command parsing to **Cobra** (`github.com/spf13/cobra`) with resource commands (`cluster`, `decision`, `memory`, `config`) and top-level aliases (`status`, `queue`, `approve`, `reject`, `ask`).
+  - Added **Lipgloss** (`github.com/charmbracelet/lipgloss`) TUI styling, colorized headers, telemetry boxes, and Lipgloss tables for tabular data.
+  - Added **Huh** (`github.com/charmbracelet/huh`) interactive selection and input prompts when required flags/args are omitted.
+  - Added **Spinner** (`github.com/briandowns/spinner`) terminal loading animations during API requests.
+  - Added **Viper** (`github.com/spf13/viper`) YAML configuration management (`~/.cortexops/config.yaml`) with `config view/get/set` subcommands.
+  - Added **Term** (`golang.org/x/term`) non-TTY stdout detection to automatically strip colors/styling when piped or redirected.
+  - Added `--output` (`table`, `json`, `plain`), `--quiet`, `--limit`, and `--status` flags.
+  - Added Cobra native `completion bash|zsh|fish` and `version` commands.
 - [x] **One-Command Launcher (`start.sh`)**
   - Created root-level `start.sh` script starting all 3 services with colorful output and `Ctrl+C` cleanup.
 - [x] **README Rewrite**
-  - Added Quick Start, frontend setup, CLI documentation, architecture diagram, safety design section, and test instructions.
+  - Added Quick Start, frontend setup, CLI TUI documentation, architecture diagram, safety design section, and test instructions.
 - [x] **Architecture Doc Cleanup**
   - Marked all resolved design decisions as `[x]` in `docs/architecture.md`.
 - [x] **Periodic Re-Observe Cycle**
