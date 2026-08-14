@@ -42,15 +42,16 @@ const (
 
 // Global flag variables
 var (
-	outputFormat string
-	flagQuiet    bool
-	flagNoColor  bool
-	flagLimit    int
-	flagStatus   string
-	flagAPIURL   string
-	flagWatch    bool
-	configFile   string
-	isTTY        bool
+	outputFormat     string
+	flagQuiet        bool
+	flagNoColor      bool
+	flagLimit        int
+	flagStatus       string
+	flagAPIURL       string
+	flagWatch        bool
+	flagAdvancedInit bool
+	configFile       string
+	isTTY            bool
 )
 
 // ============================================================================
@@ -520,9 +521,10 @@ var initCmd = &cobra.Command{
 	Short:   "Run interactive CockroachDB cluster onboarding wizard",
 	Long:    "Guides you through connecting a CockroachDB cluster, verifying connectivity, and configuring AI settings.",
 	Example: "  cortexops init\n" +
+		"  cortexops init --advanced\n" +
 		"  cortexops onboard",
 	Run: func(cmd *cobra.Command, args []string) {
-		runOnboardingWizard(true)
+		runOnboardingWizard(flagAdvancedInit)
 	},
 }
 
@@ -787,6 +789,7 @@ func init() {
 	configCmd.AddCommand(configViewCmd, configGetCmd, configSetCmd)
 	rootCmd.AddCommand(configCmd)
 
+	initCmd.Flags().BoolVarP(&flagAdvancedInit, "advanced", "a", false, "Configure advanced onboarding parameters (API endpoint, AI toggles)")
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(versionCmd)
 
@@ -1868,45 +1871,98 @@ func saveClusterConfig(name, apiURL, connStr string, aiEnabled bool, markOnboard
 	return nil
 }
 
-func runOnboardingWizard(force bool) {
+func runOnboardingWizard(advanced bool) {
 	if !isTTY || flagQuiet || getEffectiveOutputFormat() == "json" {
 		return
 	}
 
-	// 1. Welcome Banner
+	// 1. Dynamic Terminal Width calculation for clean border wrapping
+	termWidth := 80
+	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+		termWidth = w
+	}
+	boxWidth := termWidth - 4
+	if boxWidth < 40 {
+		boxWidth = 40
+	} else if boxWidth > 76 {
+		boxWidth = 76
+	}
+
+	// 2. Welcome Banner with dynamic width and wrapped description
+	welcomeHeader := brandMarkStyle.Render("🚀 CortexOps — Cluster Onboarding Wizard")
+	welcomeSub := subTitleStyle.Width(boxWidth - 6).Render("Connect your CockroachDB cluster and initialize autonomous AI operations in seconds.")
+
 	welcomeBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorCoral).
 		Padding(1, 2).
+		Width(boxWidth).
 		MarginBottom(1).
-		Render(
-			brandMarkStyle.Render("🚀 CortexOps — Interactive Cluster Onboarding Wizard\n") +
-				subTitleStyle.Render("Connect your CockroachDB cluster, configure AI runbooks & safety gate in 30 seconds."),
-		)
+		Render(welcomeHeader + "\n" + welcomeSub)
+
 	fmt.Println(welcomeBox)
 
-	clusterName := "default-cluster"
+	// Defaults
+	connStr := ""
+	clusterName := ""
 	apiURL := "http://localhost:4000"
-	connStr := "postgresql://root@localhost:26257/defaultdb?sslmode=disable"
 	aiEnabled := true
 
 	for {
-		form := huh.NewForm(
-			huh.NewGroup(
+		var groups []*huh.Group
+
+		if !advanced {
+			// Fast 2-step first-run wizard
+			groups = append(groups, huh.NewGroup(
 				huh.NewInput().
-					Title("1. Cluster Name / Environment Label").
-					Description("A friendly name to identify this CockroachDB instance").
-					Value(&clusterName).
+					Title("1. CockroachDB SQL Connection String").
+					Description("Enter your CockroachDB connection URL (stored with 0600 mode in ~/.cortexops/config.yaml)").
+					Placeholder("postgresql://<user>:<password>@<host>:<port>/<database>?sslmode=verify-full").
+					Value(&connStr).
 					Validate(func(s string) error {
-						if strings.TrimSpace(s) == "" {
-							return fmt.Errorf("cluster name cannot be empty")
+						val := strings.TrimSpace(s)
+						if val == "" {
+							return fmt.Errorf("connection string is required")
+						}
+						if !strings.HasPrefix(val, "postgres://") && !strings.HasPrefix(val, "postgresql://") {
+							return fmt.Errorf("must be a valid postgresql:// connection URL")
 						}
 						return nil
 					}),
 
 				huh.NewInput().
-					Title("2. Node Orchestrator API URL").
-					Description("Endpoint hosting Bedrock reasoning, MCP telemetry proxy & vector index").
+					Title("2. Cluster Name / Environment Label").
+					Description("A friendly label for this cluster (press enter for default: default-cluster)").
+					Placeholder("default-cluster").
+					Value(&clusterName),
+			))
+		} else {
+			// Advanced 4-step wizard
+			groups = append(groups, huh.NewGroup(
+				huh.NewInput().
+					Title("1. CockroachDB SQL Connection String").
+					Description("Enter your CockroachDB connection URL").
+					Placeholder("postgresql://<user>:<password>@<host>:<port>/<database>?sslmode=verify-full").
+					Value(&connStr).
+					Validate(func(s string) error {
+						val := strings.TrimSpace(s)
+						if val == "" {
+							return fmt.Errorf("connection string is required")
+						}
+						if !strings.HasPrefix(val, "postgres://") && !strings.HasPrefix(val, "postgresql://") {
+							return fmt.Errorf("must be a valid postgresql:// connection URL")
+						}
+						return nil
+					}),
+
+				huh.NewInput().
+					Title("2. Cluster Name / Environment Label").
+					Placeholder("default-cluster").
+					Value(&clusterName),
+
+				huh.NewInput().
+					Title("3. Node Orchestrator API URL").
+					Description("Endpoint hosting Bedrock reasoning, MCP telemetry & vector index").
 					Value(&apiURL).
 					Validate(func(s string) error {
 						if !strings.HasPrefix(s, "http://") && !strings.HasPrefix(s, "https://") {
@@ -1915,32 +1971,26 @@ func runOnboardingWizard(force bool) {
 						return nil
 					}),
 
-				huh.NewInput().
-					Title("3. CockroachDB SQL Connection String").
-					Description("Used by Go-Agent safety executor (stored securely with 0600 permissions)").
-					Value(&connStr).
-					Validate(func(s string) error {
-						if !strings.HasPrefix(s, "postgres://") && !strings.HasPrefix(s, "postgresql://") {
-							return fmt.Errorf("must be a valid postgresql:// connection string")
-						}
-						return nil
-					}),
-
 				huh.NewConfirm().
 					Title("4. Enable AI-assisted decision making (Claude 3.5 Sonnet / AWS Bedrock)?").
 					Description("Allows the agent to synthesize CockroachDB Agent Skills runbooks").
 					Value(&aiEnabled),
-			),
-		)
+			))
+		}
 
+		form := huh.NewForm(groups...)
 		if err := form.Run(); err != nil {
 			fmt.Println(subTitleStyle.Render("Setup cancelled."))
 			return
 		}
 
+		if strings.TrimSpace(clusterName) == "" {
+			clusterName = "default-cluster"
+		}
+
 		// Step 3: Test live connection
 		s := startSpinner("Testing connection to CockroachDB cluster via orchestrator API...")
-		time.Sleep(400 * time.Millisecond)
+		time.Sleep(300 * time.Millisecond)
 		ok, errMsg := testClusterConnectionLive(apiURL)
 		stopSpinner(s)
 
