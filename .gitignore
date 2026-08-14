@@ -12,7 +12,7 @@ go-agent/.env
 node-orchestrator/.env
 go-agent/go-agent
 bootstrap
-cortexops
-go-agent/cortexops
+/cortexops
+/go-agent/cortexops
 .aws-sam/
 skills/
