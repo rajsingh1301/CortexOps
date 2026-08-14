@@ -1,39 +1,65 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg-dark: #070a13;
-  --bg-card: rgba(15, 23, 42, 0.65);
-  --bg-card-hover: rgba(30, 41, 59, 0.75);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(6, 182, 212, 0.3);
+  /* Dark Mode (Default) */
+  --logdy-bg: #0f141c;
+  --logdy-nav-bg: #0a0e14;
+  --logdy-code-bg: #1a2230;
+  --logdy-code-header: #111824;
+  --logdy-card-bg: #141c28;
+  --logdy-card-hover: #182232;
+  --logdy-card-border: rgba(255, 255, 255, 0.08);
+  --logdy-border: rgba(255, 255, 255, 0.08);
+  --logdy-border-subtle: #1e293b;
+  
+  --logdy-orange: #ff7a00;
+  --logdy-coral: #ff5252;
+  --logdy-cyan: #00bcd4;
+  --logdy-green: #10b981;
+  --logdy-amber: #ffb300;
 
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --logdy-text-heading: #ffffff;
+  --logdy-text-main: #f1f5f9;
+  --logdy-text-muted: #94a3b8;
+  --logdy-text-dim: #64748b;
 
-  --accent-cyan: #06b6d4;
-  --accent-cyan-glow: rgba(6, 182, 212, 0.2);
-  --accent-purple: #8b5cf6;
-  --accent-purple-glow: rgba(139, 92, 246, 0.2);
+  --logdy-btn-alt-bg: rgba(255, 255, 255, 0.05);
+  --logdy-btn-alt-border: rgba(255, 255, 255, 0.12);
+  --logdy-btn-alt-text: #f1f5f9;
+  --logdy-btn-alt-hover-bg: rgba(255, 255, 255, 0.1);
 
-  --status-proposed-bg: rgba(245, 158, 11, 0.12);
-  --status-proposed-border: rgba(245, 158, 11, 0.3);
-  --status-proposed-text: #fbbf24;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
 
-  --status-executed-bg: rgba(16, 185, 129, 0.12);
-  --status-executed-border: rgba(16, 185, 129, 0.3);
-  --status-executed-text: #34d399;
+[data-theme="light"] {
+  /* Developer Light Mode (GitHub / VSCode Light Theme) */
+  --logdy-bg: #f8fafc;
+  --logdy-nav-bg: #ffffff;
+  --logdy-code-bg: #1e293b; /* Keep terminal authentic & high-contrast */
+  --logdy-code-header: #0f172a;
+  --logdy-card-bg: #ffffff;
+  --logdy-card-hover: #f1f5f9;
+  --logdy-card-border: #e2e8f0;
+  --logdy-border: #e2e8f0;
+  --logdy-border-subtle: #e2e8f0;
 
-  --status-failed-bg: rgba(244, 63, 94, 0.12);
-  --status-failed-border: rgba(244, 63, 94, 0.3);
-  --status-failed-text: #fb7185;
+  /* Accessible contrast on light substrate (WCAG AA compliant) */
+  --logdy-orange: #d95d00;
+  --logdy-coral: #dc2626;
+  --logdy-cyan: #0284c7;
+  --logdy-green: #059669;
+  --logdy-amber: #d97706;
 
-  --status-rejected-bg: rgba(100, 116, 139, 0.12);
-  --status-rejected-border: rgba(100, 116, 139, 0.3);
-  --status-rejected-text: #cbd5e1;
+  --logdy-text-heading: #0f172a;
+  --logdy-text-main: #1e293b;
+  --logdy-text-muted: #475569;
+  --logdy-text-dim: #64748b;
 
-  --font-heading: 'Outfit', sans-serif;
-  --font-body: 'Plus Jakarta Sans', sans-serif;
+  --logdy-btn-alt-bg: #ffffff;
+  --logdy-btn-alt-border: #cbd5e1;
+  --logdy-btn-alt-text: #0f172a;
+  --logdy-btn-alt-hover-bg: #f1f5f9;
 }
 
 * {
@@ -43,188 +69,198 @@
 }
 
 body {
-  background-color: var(--bg-dark);
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.12) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.12) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(15, 23, 42, 0.9) 0px, transparent 50%);
-  background-attachment: fixed;
-  color: var(--text-main);
+  background-color: var(--logdy-bg);
+  color: var(--logdy-text-main);
   font-family: var(--font-body);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-/* Typography */
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-heading);
+header, nav, footer, .feature-box, .logdy-btn-alt, .logdy-btn-brand {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.orange {
+  color: var(--logdy-orange);
+  font-weight: 700;
+}
+
+.cyan {
+  color: var(--logdy-cyan);
   font-weight: 600;
-  letter-spacing: -0.02em;
 }
 
-/* Glassmorphism Panel */
-.glass-panel {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.coral {
+  color: var(--logdy-coral);
+  font-weight: 700;
 }
 
-.glass-panel:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 15px 35px -10px rgba(6, 182, 212, 0.15);
-}
-
-/* Glowing Badges */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
+.green {
+  color: var(--logdy-green);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
-.badge-proposed {
-  background: var(--status-proposed-bg);
-  border: 1px solid var(--status-proposed-border);
-  color: var(--status-proposed-text);
-}
-
-.badge-executed {
-  background: var(--status-executed-bg);
-  border: 1px solid var(--status-executed-border);
-  color: var(--status-executed-text);
-}
-
-.badge-failed {
-  background: var(--status-failed-bg);
-  border: 1px solid var(--status-failed-border);
-  color: var(--status-failed-text);
-}
-
-.badge-rejected {
-  background: var(--status-rejected-bg);
-  border: 1px solid var(--status-rejected-border);
-  color: var(--status-rejected-text);
-}
-
-/* Glowing Button */
-.btn-glow {
-  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
-  color: #ffffff;
-  font-weight: 600;
-  padding: 8px 16px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px 0 rgba(6, 182, 212, 0.35);
-}
-
-.btn-glow:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.45);
-}
-
-.btn-glow:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* Pulse Animation */
-@keyframes pulse-glow {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.05); }
-}
-
-.pulse-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--accent-cyan);
-  box-shadow: 0 0 10px var(--accent-cyan);
-  animation: pulse-glow 2s infinite ease-in-out;
-}
-
-/* Terminal & Code Block */
-.terminal-block {
-  background: rgba(2, 6, 23, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 12px 16px;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+/* Code block matching logdy / shiki (Always dark for authenticity) */
+.logdy-terminal-box {
+  background: var(--logdy-code-bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  text-align: left;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
-  color: #38bdf8;
+  line-height: 1.5;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  position: relative;
+}
+
+.logdy-terminal-header {
+  background: var(--logdy-code-header);
+  padding: 8px 14px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.logdy-terminal-body {
+  padding: 16px 20px;
   overflow-x: auto;
+  color: #e2e8f0;
 }
 
-.skill-tag {
-  background: rgba(139, 92, 246, 0.15);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  color: #c084fc;
-  font-size: 0.75rem;
-  padding: 3px 10px;
-  border-radius: 6px;
-  font-weight: 500;
+/* Feature Grid Box */
+.feature-box {
+  background: var(--logdy-card-bg);
+  border: 1px solid var(--logdy-card-border);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: left;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-/* Action Buttons */
-.btn-approve {
-  background: linear-gradient(135deg, #059669, #10b981);
+.feature-box:hover {
+  border-color: var(--logdy-orange);
+  background: var(--logdy-card-hover);
+}
+
+.feature-box h3 {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--logdy-text-heading);
+  margin-bottom: 8px;
+}
+
+.feature-box p {
+  color: var(--logdy-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Buttons */
+.logdy-btn-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--logdy-orange);
   color: #ffffff;
-  font-weight: 600;
-  padding: 8px 18px;
-  border-radius: 10px;
+  padding: 10px 22px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-decoration: none;
   border: none;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.3);
+  box-shadow: 0 2px 10px rgba(217, 93, 0, 0.3);
 }
 
-.btn-approve:hover:not(:disabled) {
+.logdy-btn-brand:hover {
+  background: #ea580c;
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px 0 rgba(16, 185, 129, 0.45);
 }
 
-.btn-reject {
-  background: rgba(244, 63, 94, 0.15);
-  border: 1px solid rgba(244, 63, 94, 0.3);
-  color: #fb7185;
-  font-weight: 600;
-  padding: 8px 18px;
-  border-radius: 10px;
-  cursor: pointer;
+.logdy-btn-alt {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  background: var(--logdy-btn-alt-bg);
+  color: var(--logdy-btn-alt-text);
+  padding: 10px 22px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.88rem;
+  text-decoration: none;
+  border: 1px solid var(--logdy-btn-alt-border);
+  cursor: pointer;
+}
+
+.logdy-btn-alt:hover {
+  background: var(--logdy-btn-alt-hover-bg);
+  transform: translateY(-1px);
+}
+
+/* Copy Button */
+.copy-pill-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.copy-pill-btn:hover {
+  background: rgba(255, 122, 0, 0.2);
+  border-color: var(--logdy-orange);
+  color: var(--logdy-orange);
+}
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+  background: var(--logdy-btn-alt-bg);
+  border: 1px solid var(--logdy-btn-alt-border);
+  color: var(--logdy-text-muted);
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.btn-reject:hover:not(:disabled) {
-  background: rgba(244, 63, 94, 0.25);
-  color: #ffffff;
+.theme-toggle-btn:hover {
+  color: var(--logdy-orange);
+  border-color: var(--logdy-orange);
 }
 
-.btn-approve:disabled, .btn-reject:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
+::-webkit-scrollbar-track {
+  background: var(--logdy-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--logdy-orange);
+}

@@ -1,6 +1,6 @@
 # CortexOps Go Agent — Build Commands
 
-.PHONY: build test run build-lambda build-cli deploy clean
+.PHONY: build test run build-lambda build-cli install deploy clean
 
 # Build HTTP server mode (local dev)
 build:
@@ -10,6 +10,13 @@ build:
 build-cli:
 	go build -v -o cortexops ./cmd/cortexops/
 	@echo "✅ CLI binary built: ./cortexops"
+
+# Install CLI globally to PATH (~/.local/bin)
+install: build-cli
+	@mkdir -p $(HOME)/.local/bin $(HOME)/go/bin
+	@cp -f cortexops $(HOME)/.local/bin/cortexops
+	@cp -f cortexops $(HOME)/go/bin/cortexops
+	@echo "🚀 CortexOps CLI installed globally! Run 'cortexops' from anywhere in your terminal."
 
 # Run all tests
 test:
