@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -1939,30 +1940,46 @@ func maskConnStr(s string) string {
 	return s
 }
 
-func testClusterConnectionLive(apiURL string) (bool, string) {
+func testClusterConnectionLive(apiURL, connStr string) (bool, string) {
 	client := http.Client{
 		Timeout: 2500 * time.Millisecond,
 	}
 	cleanURL := strings.TrimRight(apiURL, "/")
 	resp, err := client.Get(cleanURL + "/cluster/health")
-	if err != nil {
-		// Fallback for macOS localhost vs 127.0.0.1 IPv6/IPv4 loopback
-		if strings.Contains(cleanURL, "localhost") {
-			fallbackURL := strings.Replace(cleanURL, "localhost", "127.0.0.1", 1)
-			if resp2, err2 := client.Get(fallbackURL + "/cluster/health"); err2 == nil {
-				defer resp2.Body.Close()
-				if resp2.StatusCode == http.StatusOK {
-					return true, ""
-				}
+	if err == nil {
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			return true, ""
+		}
+	} else if strings.Contains(cleanURL, "localhost") {
+		fallbackURL := strings.Replace(cleanURL, "localhost", "127.0.0.1", 1)
+		if resp2, err2 := client.Get(fallbackURL + "/cluster/health"); err2 == nil {
+			defer resp2.Body.Close()
+			if resp2.StatusCode == http.StatusOK {
+				return true, ""
 			}
 		}
+	}
+
+	// Direct CockroachDB cluster TCP connectivity validation
+	if connStr != "" {
+		if u, err := url.Parse(connStr); err == nil && u.Host != "" {
+			hostPort := u.Host
+			if !strings.Contains(hostPort, ":") {
+				hostPort += ":26257"
+			}
+			conn, err := net.DialTimeout("tcp", hostPort, 3*time.Second)
+			if err == nil {
+				_ = conn.Close()
+				return true, ""
+			}
+		}
+	}
+
+	if err != nil {
 		return false, fmt.Sprintf("Failed to reach endpoint: %v", err)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Sprintf("HTTP %d returned from %s/cluster/health", resp.StatusCode, apiURL)
-	}
-	return true, ""
+	return false, fmt.Sprintf("HTTP %d returned from %s/cluster/health", resp.StatusCode, apiURL)
 }
 
 func saveClusterConfig(name, apiURL, connStr string, aiEnabled bool, markOnboarded bool) error {
@@ -2127,9 +2144,9 @@ func runOnboardingWizard(advanced bool) {
 		}
 
 		// Step 3: Test live connection
-		s := startSpinner("Testing connection to CockroachDB cluster via orchestrator API...")
+		s := startSpinner("Testing connection to CockroachDB cluster...")
 		time.Sleep(300 * time.Millisecond)
-		ok, errMsg := testClusterConnectionLive(apiURL)
+		ok, errMsg := testClusterConnectionLive(apiURL, connStr)
 		stopSpinner(s)
 
 		if ok {
@@ -2165,7 +2182,7 @@ func runOnboardingWizard(advanced bool) {
 		if action == "retry" {
 			s2 := startSpinner("Retrying connection...")
 			time.Sleep(400 * time.Millisecond)
-			ok2, _ := testClusterConnectionLive(apiURL)
+			ok2, _ := testClusterConnectionLive(apiURL, connStr)
 			stopSpinner(s2)
 			if ok2 {
 				fmt.Println(successStyle.Render(fmt.Sprintf("%s Connection verified!", iconSuccess)) + " Cluster is reachable.")
@@ -2309,7 +2326,7 @@ func handleClusterAdd() {
 
 	s := startSpinner("Testing connection to new cluster...")
 	time.Sleep(300 * time.Millisecond)
-	ok, _ := testClusterConnectionLive(apiURL)
+	ok, _ := testClusterConnectionLive(apiURL, connStr)
 	stopSpinner(s)
 
 	if ok {
