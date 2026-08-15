@@ -536,12 +536,16 @@ var clusterRemoveCmd = &cobra.Command{
 	Aliases: []string{"rm", "delete", "disconnect"},
 	Short:   "Disconnect and remove a configured cluster profile",
 	Long:    "Removes a CockroachDB cluster configuration from ~/.cortexops/config.yaml.",
-	Example: "  cortexops cluster remove default-cluster\n" +
-		"  cortexops cluster disconnect",
+	Example: "  cortexops cluster remove perky-tamarin\n" +
+		"  cortexops cluster remove",
 	Run: func(cmd *cobra.Command, args []string) {
 		name := ""
 		if len(args) > 0 {
-			name = args[0]
+			if args[0] == "cluster" && len(args) > 1 {
+				name = args[1]
+			} else {
+				name = args[0]
+			}
 		}
 		handleClusterRemove(name)
 	},
@@ -568,7 +572,11 @@ var aliasDisconnectCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := ""
 		if len(args) > 0 {
-			name = args[0]
+			if args[0] == "cluster" && len(args) > 1 {
+				name = args[1]
+			} else {
+				name = args[0]
+			}
 		}
 		handleClusterRemove(name)
 	},
