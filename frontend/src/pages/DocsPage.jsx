@@ -163,54 +163,202 @@ cortexops status --watch
 cortexops queue`} />
           </section>
 
-          {/* 3. CORE COMMANDS */}
+          {/* 3. CORE COMMAND REFERENCE */}
           <section id="commands" style={{ marginBottom: '50px', scrollMarginTop: '90px' }}>
             <h2 style={{ fontSize: '1.4rem', color: 'var(--logdy-text-heading)', fontWeight: '700', marginBottom: '10px' }}>
-              Core Command Matrix
+              Full Command Reference
             </h2>
-            
-            <div className="feature-box" style={{ padding: 0, overflowX: 'auto', marginBottom: '20px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--logdy-card-border)', background: 'rgba(0,0,0,0.03)' }}>
-                    <th style={{ textAlign: 'left', padding: '12px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)' }}>COMMAND</th>
-                    <th style={{ textAlign: 'left', padding: '12px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)' }}>DESCRIPTION</th>
-                    <th style={{ textAlign: 'left', padding: '12px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)' }}>FLAGS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
-                    <td className="mono" style={{ padding: '12px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cluster get-health</td>
-                    <td style={{ padding: '12px 14px', color: 'var(--logdy-text-muted)' }}>Inspects live CPU %, queries, contention, replication.</td>
-                    <td className="mono cyan" style={{ padding: '12px 14px' }}>--watch, --output json</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
-                    <td className="mono" style={{ padding: '12px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>decision list</td>
-                    <td style={{ padding: '12px 14px', color: 'var(--logdy-text-muted)' }}>Lists pending proposed AI remediations in approval queue.</td>
-                    <td className="mono cyan" style={{ padding: '12px 14px' }}>--status, --limit, -n</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
-                    <td className="mono" style={{ padding: '12px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>decision approve [id]</td>
-                    <td style={{ padding: '12px 14px', color: 'var(--logdy-text-muted)' }}>Authorizes decision ID; executes whitelisted ccloud command.</td>
-                    <td className="mono cyan" style={{ padding: '12px 14px' }}>Interactive prompt if ID omitted</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
-                    <td className="mono" style={{ padding: '12px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>decision reject [id]</td>
-                    <td style={{ padding: '12px 14px', color: 'var(--logdy-text-muted)' }}>Marks decision as rejected in CockroachDB decision journal.</td>
-                    <td className="mono cyan" style={{ padding: '12px 14px' }}>Interactive prompt if ID omitted</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
-                    <td className="mono" style={{ padding: '12px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>memory search "&lt;q&gt;"</td>
-                    <td style={{ padding: '12px 14px', color: 'var(--logdy-text-muted)' }}>Semantic vector similarity search over historical decision reasoning.</td>
-                    <td className="mono cyan" style={{ padding: '12px 14px' }}>--limit, --output json</td>
-                  </tr>
-                  <tr>
-                    <td className="mono" style={{ padding: '12px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>config view / set</td>
-                    <td style={{ padding: '12px 14px', color: 'var(--logdy-text-muted)' }}>Manages persistent YAML settings (~/.cortexops/config.yaml).</td>
-                    <td className="mono cyan" style={{ padding: '12px 14px' }}>api_url, output, default_limit</td>
-                  </tr>
-                </tbody>
-              </table>
+            <p style={{ color: 'var(--logdy-text-muted)', fontSize: '0.92rem', marginBottom: '16px' }}>
+              Every command supports human-readable styled TUI tables, interactive Huh dropdowns, and automation-friendly JSON outputs.
+            </p>
+
+            {/* 3.1 ONBOARDING & SETUP */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--logdy-orange)', fontWeight: '700', marginBottom: '8px', fontFamily: 'var(--font-mono)' }}>
+                1. Onboarding & First-Run
+              </h3>
+              <div className="feature-box" style={{ padding: 0, overflowX: 'auto', marginBottom: '14px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)', background: 'rgba(0,0,0,0.03)' }}>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)', width: '30%' }}>COMMAND</th>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)' }}>DESCRIPTION & USAGE</th>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)', width: '25%' }}>FLAGS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cortexops init</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Launches interactive 2-step setup (Connection URL & Cluster Label).</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>-a, --advanced</td>
+                    </tr>
+                    <tr>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cortexops init --advanced</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Configures all 4 parameters: Conn URL, Cluster Label, Orchestrator API URL, and Bedrock AI assist toggle.</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>Aliases: onboard, setup</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 3.2 CLUSTER MANAGEMENT */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--logdy-orange)', fontWeight: '700', marginBottom: '8px', fontFamily: 'var(--font-mono)' }}>
+                2. Cluster Management (<code className="mono">cortexops cluster ...</code>)
+              </h3>
+              <div className="feature-box" style={{ padding: 0, overflowX: 'auto', marginBottom: '14px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)', background: 'rgba(0,0,0,0.03)' }}>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)', width: '30%' }}>COMMAND</th>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)' }}>DESCRIPTION & USAGE</th>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)', width: '25%' }}>FLAGS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cluster get-health</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Fetches live cluster CPU %, active queries, contention events, replication health, and safety gate state.</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>-w, --watch, -o json</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cluster list</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Lists all saved CockroachDB clusters with active indicator (<span style={{ color: 'var(--logdy-green)', fontWeight: 'bold' }}>● ACTIVE</span>).</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>Aliases: ls, show</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cluster add</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Interactively prompts and connects a new CockroachDB cluster profile with live ping validation.</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>Interactive wizard</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cluster switch [name]</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Switches the active CockroachDB cluster used for telemetry and remediation execution.</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>Aliases: use</td>
+                    </tr>
+                    <tr>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cluster remove [name]</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Disconnects and deletes a cluster configuration profile from persistent storage.</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>Aliases: rm, delete, disconnect</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 3.3 DECISION APPROVALS */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--logdy-orange)', fontWeight: '700', marginBottom: '8px', fontFamily: 'var(--font-mono)' }}>
+                3. Decision Approvals & Execution (<code className="mono">cortexops decision ...</code>)
+              </h3>
+              <div className="feature-box" style={{ padding: 0, overflowX: 'auto', marginBottom: '14px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)', background: 'rgba(0,0,0,0.03)' }}>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)', width: '30%' }}>COMMAND</th>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)' }}>DESCRIPTION & USAGE</th>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)', width: '25%' }}>FLAGS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>decision list</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Interactive Bubbletea TUI list to browse proposed decisions, approve with [a], or reject with [r].</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>--status, --limit, -n</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>decision approve [id]</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Authorizes decision ID and triggers safety-gated execution of the remediating CockroachDB action.</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>Interactive menu if ID omitted</td>
+                    </tr>
+                    <tr>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>decision reject [id]</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Marks decision as rejected in CockroachDB decision journal without executing any command.</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>Interactive menu if ID omitted</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 3.4 OPERATIONAL VECTOR MEMORY */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--logdy-orange)', fontWeight: '700', marginBottom: '8px', fontFamily: 'var(--font-mono)' }}>
+                4. Operational Vector Memory (<code className="mono">cortexops memory ...</code>)
+              </h3>
+              <div className="feature-box" style={{ padding: 0, overflowX: 'auto', marginBottom: '14px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)', background: 'rgba(0,0,0,0.03)' }}>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)', width: '30%' }}>COMMAND</th>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)' }}>DESCRIPTION & USAGE</th>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)', width: '25%' }}>FLAGS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>memory search "&lt;query&gt;"</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Semantic cosine similarity search across historical decisions, reasoning rationale, and execution outcomes.</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>-n, --limit, -o json</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 3.5 CONFIGURATION */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--logdy-orange)', fontWeight: '700', marginBottom: '8px', fontFamily: 'var(--font-mono)' }}>
+                5. Configuration Management (<code className="mono">cortexops config ...</code>)
+              </h3>
+              <div className="feature-box" style={{ padding: 0, overflowX: 'auto', marginBottom: '14px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)', background: 'rgba(0,0,0,0.03)' }}>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)', width: '30%' }}>COMMAND</th>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)' }}>DESCRIPTION & USAGE</th>
+                      <th style={{ textAlign: 'left', padding: '10px 14px', color: 'var(--logdy-orange)', fontFamily: 'var(--font-mono)', width: '25%' }}>FLAGS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>config view</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Displays effective configuration settings and active file path (~/.cortexops/config.yaml).</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>-o json, -o plain</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--logdy-card-border)' }}>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>config get &lt;key&gt;</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Reads a specific configuration key value (<code className="mono">api_url</code>, <code className="mono">output</code>, <code className="mono">no_color</code>, <code className="mono">default_limit</code>).</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>Scriptable</td>
+                    </tr>
+                    <tr>
+                      <td className="mono" style={{ padding: '10px 14px', color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>config set &lt;key&gt; &lt;val&gt;</td>
+                      <td style={{ padding: '10px 14px', color: 'var(--logdy-text-muted)' }}>Persists configuration values to ~/.cortexops/config.yaml with secure 0600 file permissions.</td>
+                      <td className="mono cyan" style={{ padding: '10px 14px' }}>Interactive if empty</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 3.6 GLOBAL FLAGS */}
+            <div>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--logdy-orange)', fontWeight: '700', marginBottom: '8px', fontFamily: 'var(--font-mono)' }}>
+                6. Global Flags
+              </h3>
+              <div className="feature-box" style={{ padding: '16px 20px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+                  <div><strong className="cyan">-o, --output</strong>: table | json | plain</div>
+                  <div><strong className="cyan">-q, --quiet</strong>: Print essential IDs only</div>
+                  <div><strong className="cyan">--no-color</strong>: Disable ANSI color codes</div>
+                  <div><strong className="cyan">-n, --limit</strong>: Limit returned item count</div>
+                  <div><strong className="cyan">--status</strong>: proposed | executed | rejected</div>
+                  <div><strong className="cyan">--api-url</strong>: Override orchestrator API URL</div>
+                  <div><strong className="cyan">--config</strong>: Custom config file path</div>
+                  <div><strong className="cyan">-h, --help</strong>: Print command help screen</div>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -231,15 +379,19 @@ cortexops queue`} />
                 </div>
                 <div>
                   <span style={{ color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cortexops approve [id]</span>
-                  <div style={{ color: 'var(--logdy-text-dim)', fontSize: '0.8rem' }}>→ <span className="cyan">decision approve</span></div>
+                  <div style={{ color: 'var(--logdy-text-dim)', fontSize: '0.8rem' }}>→ <span className="cyan">decision approve [id]</span></div>
                 </div>
                 <div>
                   <span style={{ color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cortexops reject [id]</span>
-                  <div style={{ color: 'var(--logdy-text-dim)', fontSize: '0.8rem' }}>→ <span className="cyan">decision reject</span></div>
+                  <div style={{ color: 'var(--logdy-text-dim)', fontSize: '0.8rem' }}>→ <span className="cyan">decision reject [id]</span></div>
                 </div>
                 <div>
                   <span style={{ color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cortexops ask "&lt;q&gt;"</span>
-                  <div style={{ color: 'var(--logdy-text-dim)', fontSize: '0.8rem' }}>→ <span className="cyan">memory search</span></div>
+                  <div style={{ color: 'var(--logdy-text-dim)', fontSize: '0.8rem' }}>→ <span className="cyan">memory search "&lt;q&gt;"</span></div>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--logdy-text-heading)', fontWeight: 'bold' }}>cortexops disconnect [name]</span>
+                  <div style={{ color: 'var(--logdy-text-dim)', fontSize: '0.8rem' }}>→ <span className="cyan">cluster remove [name]</span></div>
                 </div>
               </div>
             </div>
