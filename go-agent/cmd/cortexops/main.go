@@ -200,7 +200,13 @@ func isOnboardingCompleted() bool {
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return false
 	}
-	return viper.GetBool("onboarding_completed")
+	if viper.GetBool("onboarding_completed") {
+		return true
+	}
+	if len(viper.GetStringMap("clusters")) > 0 || viper.GetString("api_url") != "" {
+		return true
+	}
+	return false
 }
 
 func initViper() {
