@@ -27,14 +27,19 @@ else
     exit 1
 fi
 
-# Try copying to /usr/local/bin if writable
-if [ -w "/usr/local/bin" ]; then
-    cp -f "${INSTALL_DIR}/cortexops" "/usr/local/bin/cortexops" 2>/dev/null || true
+# Install to /usr/local/bin (which is always in default system PATH)
+INSTALLED_GLOBAL=false
+if cp -f "${INSTALL_DIR}/cortexops" "/usr/local/bin/cortexops" 2>/dev/null; then
+    chmod +x "/usr/local/bin/cortexops" 2>/dev/null || true
+    INSTALLED_GLOBAL=true
+elif command -v sudo >/dev/null 2>&1 && sudo -n cp -f "${INSTALL_DIR}/cortexops" "/usr/local/bin/cortexops" 2>/dev/null; then
+    sudo -n chmod +x "/usr/local/bin/cortexops" 2>/dev/null || true
+    INSTALLED_GLOBAL=true
 fi
 
 # Automatically add to shell RC file if not in PATH
 SHELL_RC=""
-if [ -n "$ZSH_VERSION" ] || [ -f "$HOME/.zshrc" ]; then
+if [ -f "$HOME/.zshrc" ]; then
     SHELL_RC="$HOME/.zshrc"
 elif [ -f "$HOME/.bashrc" ]; then
     SHELL_RC="$HOME/.bashrc"
@@ -42,12 +47,11 @@ elif [ -f "$HOME/.bash_profile" ]; then
     SHELL_RC="$HOME/.bash_profile"
 fi
 
-if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
-    if [ -n "$SHELL_RC" ]; then
-        if ! grep -q '.local/bin' "$SHELL_RC" 2>/dev/null; then
-            echo 'export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"' >> "$SHELL_RC"
-            echo "🔧 Added ~/.local/bin to ${SHELL_RC}"
-        fi
+if [ -n "$SHELL_RC" ]; then
+    if ! grep -q '.local/bin' "$SHELL_RC" 2>/dev/null; then
+        echo '' >> "$SHELL_RC"
+        echo '# CortexOps CLI PATH' >> "$SHELL_RC"
+        echo 'export PATH="$HOME/.local/bin:$HOME/go/bin:/usr/local/bin:$PATH"' >> "$SHELL_RC"
     fi
 fi
 
