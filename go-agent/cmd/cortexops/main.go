@@ -333,10 +333,17 @@ func parseIntVal(v interface{}) int {
 func getQuickClusterStatus() (bool, string) {
 	apiURL := getEffectiveAPIURL()
 	client := http.Client{
-		Timeout: 200 * time.Millisecond,
+		Timeout: 300 * time.Millisecond,
 	}
 	resp, err := client.Get(apiURL + "/cluster/health")
 	if err != nil || resp.StatusCode != http.StatusOK {
+		if strings.Contains(apiURL, "localhost") {
+			fallbackURL := strings.Replace(apiURL, "localhost", "127.0.0.1", 1)
+			if resp2, err2 := client.Get(fallbackURL + "/cluster/health"); err2 == nil && resp2.StatusCode == http.StatusOK {
+				_ = resp2.Body.Close()
+				return true, apiURL
+			}
+		}
 		return false, apiURL
 	}
 	_ = resp.Body.Close()
@@ -1816,8 +1823,19 @@ func testClusterConnectionLive(apiURL string) (bool, string) {
 	client := http.Client{
 		Timeout: 2500 * time.Millisecond,
 	}
-	resp, err := client.Get(strings.TrimRight(apiURL, "/") + "/cluster/health")
+	cleanURL := strings.TrimRight(apiURL, "/")
+	resp, err := client.Get(cleanURL + "/cluster/health")
 	if err != nil {
+		// Fallback for macOS localhost vs 127.0.0.1 IPv6/IPv4 loopback
+		if strings.Contains(cleanURL, "localhost") {
+			fallbackURL := strings.Replace(cleanURL, "localhost", "127.0.0.1", 1)
+			if resp2, err2 := client.Get(fallbackURL + "/cluster/health"); err2 == nil {
+				defer resp2.Body.Close()
+				if resp2.StatusCode == http.StatusOK {
+					return true, ""
+				}
+			}
+		}
 		return false, fmt.Sprintf("Failed to reach endpoint: %v", err)
 	}
 	defer resp.Body.Close()
