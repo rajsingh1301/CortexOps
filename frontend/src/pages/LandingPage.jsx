@@ -6,7 +6,7 @@ export default function LandingPage() {
   const [copiedInstall, setCopiedInstall] = useState(false);
 
   const handleCopyInstall = () => {
-    navigator.clipboard.writeText('cd go-agent && make build-cli && make install\ncortexops');
+    navigator.clipboard.writeText('curl -sSL https://raw.githubusercontent.com/rajsingh1301/CortexOps/main/install.sh | bash');
     setCopiedInstall(true);
     setTimeout(() => setCopiedInstall(false), 2000);
   };
@@ -45,18 +45,19 @@ export default function LandingPage() {
         <div className="logdy-terminal-box">
           <div className="logdy-terminal-header">
             <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
-              bash — install & run
+              bash — 1-command global install
             </span>
             <button onClick={handleCopyInstall} className="copy-pill-btn">
               {copiedInstall ? '✓ Copied' : 'Copy'}
             </button>
           </div>
           <div className="logdy-terminal-body" style={{ fontSize: '0.82rem' }}>
-            <div>
+            <div style={{ color: '#64748b', marginBottom: '4px' }}># 1-line universal global installer</div>
+            <div style={{ wordBreak: 'break-all' }}>
               <span style={{ color: '#ff7a00', fontWeight: 'bold' }}>$ </span>
-              <span style={{ color: '#00bcd4' }}>cd go-agent && make build-cli && make install</span>
+              <span style={{ color: '#00bcd4' }}>curl -sSL https://raw.githubusercontent.com/rajsingh1301/CortexOps/main/install.sh | bash</span>
             </div>
-            <div style={{ color: '#64748b', margin: '4px 0' }}># Run CortexOps CLI operator console</div>
+            <div style={{ color: '#64748b', margin: '8px 0 4px' }}># Launch CortexOps CLI operator console</div>
             <div>
               <span style={{ color: '#ff7a00', fontWeight: 'bold' }}>$ </span>
               <span style={{ color: '#ffffff', fontWeight: 'bold' }}>cortexops</span>

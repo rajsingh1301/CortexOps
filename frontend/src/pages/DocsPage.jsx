@@ -124,21 +124,33 @@ export default function DocsPage() {
           {/* 1. INSTALLATION */}
           <section id="installation" style={{ marginBottom: '50px', scrollMarginTop: '90px' }}>
             <h2 style={{ fontSize: '1.4rem', color: 'var(--logdy-text-heading)', fontWeight: '700', marginBottom: '10px' }}>
-              Building & Installing the CLI
+              Installing the CLI Globally
             </h2>
             <p style={{ color: 'var(--logdy-text-muted)', lineHeight: '1.6', fontSize: '0.92rem', marginBottom: '14px' }}>
-              The <code className="mono cyan">cortexops</code> binary is compiled using Go 1.25+ and installed to system path (<code className="mono">~/.local/bin/cortexops</code>).
+              Install <code className="mono cyan">cortexops</code> globally on macOS or Linux with a single command:
             </p>
 
-            <CodeSnippet title="terminal build" code={`# 1. Clone repository
+            <CodeSnippet title="1-line universal global installer" code={`curl -sSL https://raw.githubusercontent.com/rajsingh1301/CortexOps/main/install.sh | bash`} />
+
+            <div style={{ marginTop: '20px' }}>
+              <div className="mono orange" style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                Alternative: Go Global Install
+              </div>
+              <CodeSnippet title="go install" code={`go install github.com/rajsingh1301/CortexOps/go-agent/cmd/cortexops@latest`} />
+            </div>
+
+            <div style={{ marginTop: '20px' }}>
+              <div className="mono cyan" style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                Alternative: Build from Source
+              </div>
+              <CodeSnippet title="git clone & make" code={`# 1. Clone repository
 git clone https://github.com/rajsingh1301/CortexOps.git
 cd CortexOps/go-agent
 
-# 2. Build local binary
+# 2. Build local binary & install globally (~/.local/bin)
 make build-cli
-
-# 3. Install globally to PATH
 make install`} />
+            </div>
           </section>
 
           {/* 2. QUICK START */}
