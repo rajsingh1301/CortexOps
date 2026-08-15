@@ -27,16 +27,34 @@ else
     exit 1
 fi
 
-# Ensure ~/.local/bin is in PATH for the user session
+# Try copying to /usr/local/bin if writable
+if [ -w "/usr/local/bin" ]; then
+    cp -f "${INSTALL_DIR}/cortexops" "/usr/local/bin/cortexops" 2>/dev/null || true
+fi
+
+# Automatically add to shell RC file if not in PATH
+SHELL_RC=""
+if [ -n "$ZSH_VERSION" ] || [ -f "$HOME/.zshrc" ]; then
+    SHELL_RC="$HOME/.zshrc"
+elif [ -f "$HOME/.bashrc" ]; then
+    SHELL_RC="$HOME/.bashrc"
+elif [ -f "$HOME/.bash_profile" ]; then
+    SHELL_RC="$HOME/.bash_profile"
+fi
+
 if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
-    echo ""
-    echo "⚠️  Note: Add ${INSTALL_DIR} to your PATH if not already present:"
-    echo '    export PATH="$HOME/.local/bin:$PATH"'
+    if [ -n "$SHELL_RC" ]; then
+        if ! grep -q '.local/bin' "$SHELL_RC" 2>/dev/null; then
+            echo 'export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"' >> "$SHELL_RC"
+            echo "🔧 Added ~/.local/bin to ${SHELL_RC}"
+        fi
+    fi
 fi
 
 echo ""
-echo "✨ CortexOps CLI installed successfully to ${INSTALL_DIR}/cortexops!"
+echo "✨ CortexOps CLI installed successfully!"
 echo ""
-echo "👉 Run the following command to get started:"
+echo "👉 To use it right now in this terminal window, run:"
+echo '   export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"'
 echo "   cortexops"
 echo ""
