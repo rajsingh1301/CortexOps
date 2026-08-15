@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { embed, reason } from "./bedrock.js";
-import { listDecisions, similarDecisions, setDecisionStatus, recordOutcome, getDecisionById, getLatestSnapshot, insertDecision } from "./db.js";
+import { listDecisions, similarDecisions, setDecisionStatus, recordOutcome, getDecisionById, getLatestSnapshot, insertDecision, insertSnapshot } from "./db.js";
 
 const app = express();
 app.use(cors());
@@ -169,6 +169,16 @@ app.post("/simulate/spike", async (req, res) => {
       replication_status: "healthy",
       captured_at: new Date().toISOString()
     };
+
+    // Store the spike telemetry snapshot into CockroachDB cluster_snapshots
+    await insertSnapshot({
+      cpuPercent: cpu,
+      activeQueries: queries,
+      contentionEvents: 2,
+      replicationStatus: "healthy",
+      raw: mcpContext
+    }).catch(err => console.error("Error inserting snapshot:", err.message));
+
     const relevantSkills = [
       {
         name: "performance-and-scaling",

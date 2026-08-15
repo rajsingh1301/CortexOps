@@ -95,6 +95,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDecisions();
+    const interval = setInterval(() => {
+      fetchDecisions();
+    }, 4500);
+    return () => clearInterval(interval);
   }, []);
 
   const handleApprove = async (id) => {

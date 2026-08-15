@@ -86,6 +86,22 @@ export async function getLatestSnapshot() {
   return rows[0];
 }
 
+export async function insertSnapshot({
+  cpuPercent,
+  activeQueries,
+  contentionEvents = 0,
+  replicationStatus = "healthy",
+  raw = {}
+}) {
+  const { rows } = await pool.query(
+    `INSERT INTO cluster_snapshots (cpu_percent, active_queries, contention_events, replication_status, raw_mcp_response, captured_at)
+     VALUES ($1, $2, $3, $4, $5, now())
+     RETURNING id, cpu_percent, active_queries, contention_events, replication_status, captured_at`,
+    [cpuPercent, activeQueries, contentionEvents, replicationStatus, JSON.stringify(raw)]
+  );
+  return rows[0];
+}
+
 export async function insertDecision({
   actionType,
   triggerSource = "anomaly_detector",

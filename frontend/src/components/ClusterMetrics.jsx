@@ -54,7 +54,22 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
   // Sync when parent metrics prop updates
   useEffect(() => {
     if (metrics) {
-      if (typeof metrics.cpu_percent === 'number') setCurrentCpu(metrics.cpu_percent);
+      if (typeof metrics.cpu_percent === 'number') {
+        const val = parseFloat(Number(metrics.cpu_percent).toFixed(1));
+        setCurrentCpu(val);
+        setFlashMetric('cpu');
+        setTimeout(() => setFlashMetric(null), 1000);
+        setHistory(prev => {
+          const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return [...prev.slice(1), {
+            time: timeStr,
+            cpu: val,
+            queries: metrics.active_queries || 5,
+            contention: metrics.contention_events || 0,
+            replication: 100
+          }];
+        });
+      }
       if (metrics.active_queries !== undefined) setCurrentQueries(parseInt(metrics.active_queries, 10) || 5);
       if (metrics.contention_events !== undefined) setCurrentContention(parseInt(metrics.contention_events, 10) || 0);
     }
