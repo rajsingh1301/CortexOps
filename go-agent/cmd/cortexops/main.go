@@ -339,21 +339,23 @@ func parseIntVal(v interface{}) int {
 func getQuickClusterStatus() (bool, string) {
 	apiURL := getEffectiveAPIURL()
 	client := http.Client{
-		Timeout: 300 * time.Millisecond,
+		Timeout: 1500 * time.Millisecond,
 	}
 	resp, err := client.Get(apiURL + "/cluster/health")
-	if err != nil || resp.StatusCode != http.StatusOK {
+	if err != nil {
 		if strings.Contains(apiURL, "localhost") {
 			fallbackURL := strings.Replace(apiURL, "localhost", "127.0.0.1", 1)
-			if resp2, err2 := client.Get(fallbackURL + "/cluster/health"); err2 == nil && resp2.StatusCode == http.StatusOK {
-				_ = resp2.Body.Close()
-				return true, apiURL
+			if resp2, err2 := client.Get(fallbackURL + "/cluster/health"); err2 == nil {
+				defer resp2.Body.Close()
+				if resp2.StatusCode == http.StatusOK {
+					return true, apiURL
+				}
 			}
 		}
 		return false, apiURL
 	}
-	_ = resp.Body.Close()
-	return true, apiURL
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK, apiURL
 }
 
 func renderLandingScreen(cmd *cobra.Command) {
