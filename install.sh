@@ -54,7 +54,12 @@ fi
 echo ""
 echo "✨ CortexOps CLI installed successfully!"
 echo ""
-echo "👉 To use it right now in this terminal window, run:"
-echo '   export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"'
-echo "   cortexops"
-echo ""
+
+# Launch CortexOps immediately in the current interactive shell
+if [ -c /dev/tty ]; then
+    export PATH="${INSTALL_DIR}:${HOME}/go/bin:${PATH}"
+    exec "${INSTALL_DIR}/cortexops" "$@" < /dev/tty
+else
+    export PATH="${INSTALL_DIR}:${HOME}/go/bin:${PATH}"
+    exec "${INSTALL_DIR}/cortexops" "$@"
+fi
