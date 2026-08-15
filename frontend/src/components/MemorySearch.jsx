@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Search, Loader2, Sparkles, X, BrainCircuit, AlertCircle } from 'lucide-react';
+import { Search, Loader2, Sparkles, X, BrainCircuit, AlertCircle, Sparkle } from 'lucide-react';
 import DecisionCard from './DecisionCard';
 
 const API_BASE = 'http://localhost:4000';
 
 const SUGGESTIONS = [
   "why did you take a backup?",
-  "why did you scale up last week?",
+  "why did you scale up last time?",
   "cpu spike investigation",
   "user requested a new index"
 ];
@@ -60,34 +60,36 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
   return (
     <div>
       {/* Search Header Banner */}
-      <div className="glass-panel" style={{ padding: '28px', marginBottom: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-purple)', marginBottom: '8px' }}>
+      <div className="feature-box" style={{ padding: '24px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--logdy-cyan)', marginBottom: '8px' }}>
           <BrainCircuit size={22} />
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Semantic Vector Memory Search</h2>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--logdy-text-heading)' }}>
+            Semantic Vector Memory Search
+          </h2>
         </div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
-          Ask natural language questions to query CockroachDB C-SPANN vector cosine distance index (`embedding &lt;-&gt; $1`) over past AI operational reasoning.
+        <p style={{ color: 'var(--logdy-text-muted)', fontSize: '0.88rem', marginBottom: '18px', lineHeight: '1.5' }}>
+          Ask natural language questions to query CockroachDB C-SPANN vector cosine distance index (<code className="mono cyan">embedding &lt;-&gt; $1</code>) over past AI operational reasoning.
         </p>
 
         {/* Search Input Form */}
-        <form onSubmit={handleSubmit} style={{ position: 'relative', marginBottom: '16px' }}>
+        <form onSubmit={handleSubmit} style={{ position: 'relative', marginBottom: '14px' }}>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Search size={20} color="var(--accent-purple)" style={{ position: 'absolute', left: '16px' }} />
+            <Search size={18} color="var(--logdy-cyan)" style={{ position: 'absolute', left: '16px', pointerEvents: 'none' }} />
             <input 
               type="text" 
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g. why did you take a backup on Tuesday?"
+              placeholder="Ask why the agent made a decision (e.g. why did you scale up?)..."
               style={{
                 width: '100%',
-                padding: '14px 48px 14px 48px',
-                background: 'rgba(2, 6, 23, 0.7)',
-                border: '1px solid rgba(139, 92, 246, 0.4)',
-                borderRadius: '12px',
-                color: 'var(--text-main)',
-                fontSize: '0.95rem',
+                padding: '12px 110px 12px 46px',
+                background: 'var(--logdy-code-bg)',
+                border: '1px solid var(--logdy-card-border)',
+                borderRadius: '8px',
+                color: 'var(--logdy-text-main)',
+                fontSize: '0.9rem',
+                fontFamily: 'var(--font-body)',
                 outline: 'none',
-                boxShadow: '0 0 15px rgba(139, 92, 246, 0.15)',
                 transition: 'all 0.2s ease'
               }}
             />
@@ -97,58 +99,48 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
                 onClick={handleClear}
                 style={{
                   position: 'absolute',
-                  right: '100px',
+                  right: '90px',
                   background: 'transparent',
                   border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer'
+                  color: 'var(--logdy-text-dim)',
+                  cursor: 'pointer',
+                  padding: '4px'
                 }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             )}
             <button 
               type="submit" 
-              className="btn-glow" 
+              className="logdy-btn-brand"
               disabled={isSearching || !query.trim()}
               style={{
                 position: 'absolute',
-                right: '8px',
-                padding: '8px 16px',
-                fontSize: '0.85rem'
+                right: '6px',
+                padding: '6px 14px',
+                fontSize: '0.8rem',
+                gap: '6px'
               }}
             >
-              {isSearching ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Search
+              {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Search
             </button>
           </div>
         </form>
 
         {/* Quick Suggestion Chips */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-            Sample Queries:
+          <span style={{ fontSize: '0.75rem', color: 'var(--logdy-text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+            Try asking:
           </span>
           {SUGGESTIONS.map((chip, idx) => (
             <button 
-              key={idx}
+              key={idx} 
               onClick={() => handleChipClick(chip)}
+              className="copy-pill-btn"
               style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid var(--border-subtle)',
-                color: 'var(--text-muted)',
-                padding: '4px 12px',
-                borderRadius: '9999px',
-                fontSize: '0.78rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.5)';
-                e.currentTarget.style.color = '#c084fc';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                e.currentTarget.style.color = 'var(--text-muted)';
+                fontSize: '0.75rem',
+                padding: '4px 10px',
+                borderRadius: '4px'
               }}
             >
               "{chip}"
@@ -160,13 +152,13 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
       {/* Error Alert */}
       {error && (
         <div style={{ 
-          background: 'var(--status-failed-bg)', 
-          border: '1px solid var(--status-failed-border)', 
+          background: 'rgba(220, 38, 38, 0.1)', 
+          border: '1px solid rgba(220, 38, 38, 0.3)', 
           padding: '12px 16px', 
-          borderRadius: '10px', 
-          marginBottom: '24px',
-          color: 'var(--status-failed-text)',
-          fontSize: '0.875rem',
+          borderRadius: '6px', 
+          marginBottom: '20px',
+          color: 'var(--logdy-coral)',
+          fontSize: '0.85rem',
           display: 'flex',
           alignItems: 'center',
           gap: '8px'
@@ -177,30 +169,30 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
 
       {/* Results Header */}
       {hasSearched && !isSearching && (
-        <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>
+        <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--logdy-text-heading)', fontFamily: 'var(--font-mono)' }}>
             Vector Similarity Matches ({results.length})
           </h3>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Ordered by vector distance (<code style={{ color: 'var(--accent-purple)' }}>embedding &lt;-&gt; query</code>)
+          <span style={{ fontSize: '0.75rem', color: 'var(--logdy-text-dim)', fontFamily: 'var(--font-mono)' }}>
+            Ranked by vector cosine distance (<code className="cyan">embedding &lt;-&gt; query</code>)
           </span>
         </div>
       )}
 
       {/* Results Feed */}
       {isSearching ? (
-        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center' }}>
-          <Loader2 size={36} color="var(--accent-purple)" className="animate-spin" style={{ marginBottom: '12px', animation: 'spin 1s linear infinite' }} />
-          <h3>Generating Cohere Embeddings & Vector Search...</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Querying CockroachDB 1024-dim index
+        <div className="feature-box" style={{ padding: '40px', textAlign: 'center' }}>
+          <Loader2 size={32} color="var(--logdy-cyan)" className="animate-spin" style={{ marginBottom: '12px', animation: 'spin 1s linear infinite' }} />
+          <h3 style={{ color: 'var(--logdy-text-heading)', fontSize: '1rem' }}>Generating Cohere Embeddings & Vector Search...</h3>
+          <p style={{ fontSize: '0.82rem', color: 'var(--logdy-text-muted)', marginTop: '4px' }}>
+            Querying CockroachDB 1024-dim C-SPANN index
           </p>
         </div>
       ) : hasSearched && results.length === 0 ? (
-        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <Search size={36} color="var(--text-muted)" style={{ marginBottom: '12px' }} />
-          <h3>No Vector Similarity Matches Found</h3>
-          <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>
+        <div className="feature-box" style={{ padding: '40px', textAlign: 'center', color: 'var(--logdy-text-muted)' }}>
+          <Search size={32} color="var(--logdy-text-dim)" style={{ marginBottom: '12px' }} />
+          <h3 style={{ color: 'var(--logdy-text-heading)', fontSize: '1rem' }}>No Vector Similarity Matches Found</h3>
+          <p style={{ fontSize: '0.82rem', marginTop: '4px' }}>
             Try rephrasing your question or selecting one of the sample query chips above.
           </p>
         </div>
@@ -212,12 +204,13 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
               top: '16px',
               right: '16px',
               zIndex: 10,
-              background: 'rgba(139, 92, 246, 0.2)',
-              border: '1px solid rgba(139, 92, 246, 0.4)',
-              color: '#c084fc',
+              background: 'rgba(0, 188, 212, 0.12)',
+              border: '1px solid rgba(0, 188, 212, 0.3)',
+              color: 'var(--logdy-cyan)',
               padding: '2px 8px',
-              borderRadius: '6px',
+              borderRadius: '4px',
               fontSize: '0.72rem',
+              fontFamily: 'var(--font-mono)',
               fontWeight: 700
             }}>
               #{idx + 1} Vector Match

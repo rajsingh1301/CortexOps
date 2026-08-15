@@ -264,3 +264,154 @@ header, nav, footer, .feature-box, .logdy-btn-alt, .logdy-btn-brand {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--logdy-orange);
 }
+
+/* Status Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-proposed {
+  background: rgba(255, 122, 0, 0.12);
+  color: var(--logdy-orange);
+  border: 1px solid rgba(255, 122, 0, 0.3);
+}
+
+.badge-executed {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--logdy-green);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-rejected {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--logdy-coral);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+.badge-failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* Interactive Card Animations */
+.decision-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.decision-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 122, 0, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.card-exiting {
+  animation: fadeOutExit 0.35s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes fadeOutExit {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 500px;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.96);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 rgba(16, 185, 129, 0); }
+  50% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.5); }
+}
+
+/* Toast HUD Container */
+.toast-hud {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  min-width: 320px;
+  max-width: 440px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background: var(--logdy-code-header);
+  border: 1px solid var(--logdy-card-border);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+  color: var(--logdy-text-main);
+  font-family: var(--font-body);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toast-item.success {
+  border-left: 4px solid var(--logdy-green);
+}
+
+.toast-item.error {
+  border-left: 4px solid var(--logdy-coral);
+}
+
+.toast-item.info {
+  border-left: 4px solid var(--logdy-cyan);
+}
+
+/* Metric Cards Interactivity */
+.metric-interactive-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.metric-interactive-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--logdy-orange);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.metric-val {
+  transition: color 0.3s ease, transform 0.3s ease;
+  display: inline-block;
+}
+
+.metric-flash {
+  color: var(--logdy-orange) !important;
+  transform: scale(1.04);
+  text-shadow: 0 0 12px rgba(255, 122, 0, 0.5);
+}
+
