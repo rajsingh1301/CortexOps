@@ -164,8 +164,10 @@ type SearchMatch struct {
 	ActionType    string  `json:"action_type"`
 	ReasoningText string  `json:"reasoning_text"`
 	Confidence    float64 `json:"confidence"`
+	CcloudCommand string  `json:"ccloud_command"`
 	Status        string  `json:"status"`
 	Outcome       string  `json:"outcome"`
+	CreatedAt     string  `json:"created_at"`
 }
 
 type SearchResponse struct {
@@ -1674,23 +1676,96 @@ func handleMemorySearch(query string) {
 		return
 	}
 
+	// 1. Calculate dynamic terminal width for consistent responsive layout
+	termWidth := 80
+	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+		termWidth = w
+	}
+	boxWidth := termWidth - 4
+	if boxWidth < 50 {
+		boxWidth = 50
+	} else if boxWidth > 105 {
+		boxWidth = 105
+	}
+	contentWidth := boxWidth - 4 // minus border (2) and padding (2)
+
+	matchBoxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorSlate).
+		Padding(0, 1).
+		Width(boxWidth)
+
 	fmt.Println(brandMarkStyle.Render(fmt.Sprintf("%s Vector Memory Search Results (%d matches for \"%s\")", iconSearch, len(searchResp.Matches), query)))
+	fmt.Println()
 
 	for i, m := range searchResp.Matches {
-		rankBadge := fmt.Sprintf("#%d Vector Match", i+1)
-		cardContent := fmt.Sprintf(
-			"%s %s | Action: %s | Status: %s | Confidence: %.0f%%\n\nReasoning: %s",
-			iconInfo,
-			cmdNameStyle.Render(rankBadge),
-			warningStyle.Render(m.ActionType),
-			m.Status,
-			m.Confidence*100,
-			m.ReasoningText,
-		)
-		if m.Outcome != "" {
-			cardContent += "\nOutcome:   " + subTitleStyle.Render(m.Outcome)
+		idShort := m.ID
+		if len(idShort) > 8 {
+			idShort = idShort[:8]
 		}
-		fmt.Println(cardBoxStyle.Render(cardContent))
+
+		// Top Header Lines: Rank, Similarity, ID, Action, Status
+		headerLine1 := fmt.Sprintf("%s %s  %s",
+			iconBolt,
+			cmdNameStyle.Render(fmt.Sprintf("#%d Match", i+1)),
+			lipgloss.NewStyle().Bold(true).Foreground(colorCyan).Render(fmt.Sprintf("%.0f%% Similarity", m.Confidence*100)),
+		)
+		if idShort != "" {
+			headerLine1 += "  " + lipgloss.NewStyle().Foreground(colorSlate).Render("(id: "+idShort+")")
+		}
+
+		headerLine2 := fmt.Sprintf("Action: %s   Status: %s",
+			warningStyle.Render(strings.ToUpper(m.ActionType)),
+			formatStatusBadge(m.Status),
+		)
+
+		var lines []string
+		lines = append(lines, headerLine1, headerLine2, "")
+
+		// Reasoning Section
+		reasoningHeading := lipgloss.NewStyle().Bold(true).Foreground(colorCyan).Render("Reasoning:")
+		reasoningBody := lipgloss.NewStyle().Width(contentWidth).Render(m.ReasoningText)
+		lines = append(lines, reasoningHeading)
+		lines = append(lines, reasoningBody)
+
+		// Outcome Section (if present)
+		if m.Outcome != "" && m.Outcome != "null" {
+			lines = append(lines, "")
+			outcomeHeading := lipgloss.NewStyle().Bold(true).Foreground(colorGreen).Render("Outcome:")
+			outcomeBody := lipgloss.NewStyle().Width(contentWidth).Render(m.Outcome)
+			lines = append(lines, outcomeHeading)
+			lines = append(lines, outcomeBody)
+		}
+
+		// Command Section (if present)
+		if m.CcloudCommand != "" && m.CcloudCommand != "null" {
+			lines = append(lines, "")
+			cmdHeading := lipgloss.NewStyle().Bold(true).Foreground(colorYellow).Render("Executed Command:")
+			cmdBody := lipgloss.NewStyle().Width(contentWidth).Foreground(colorSlate).Render("$ " + m.CcloudCommand)
+			lines = append(lines, cmdHeading)
+			lines = append(lines, cmdBody)
+		}
+
+		cardContent := strings.Join(lines, "\n")
+		fmt.Println(matchBoxStyle.Render(cardContent))
+		if i < len(searchResp.Matches)-1 {
+			fmt.Println()
+		}
+	}
+}
+
+func formatStatusBadge(status string) string {
+	switch strings.ToLower(status) {
+	case "executed":
+		return successStyle.Render("✓ EXECUTED")
+	case "proposed":
+		return warningStyle.Render("● PROPOSED")
+	case "rejected":
+		return errorStyle.Render("🚫 REJECTED")
+	case "failed":
+		return errorStyle.Render("✗ FAILED")
+	default:
+		return subTitleStyle.Render(strings.ToUpper(status))
 	}
 }
 
