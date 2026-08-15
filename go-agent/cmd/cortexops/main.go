@@ -583,6 +583,20 @@ var aliasDisconnectCmd = &cobra.Command{
 	},
 }
 
+// 1.2 Simulate / Anomaly Injection command
+var simulateCmd = &cobra.Command{
+	Use:     "simulate [anomaly_type]",
+	Aliases: []string{"spike", "load", "chaos"},
+	Short:   "Simulate high cluster load or CPU anomalies to trigger AI decision flow",
+	Long:    "Simulates elevated CPU utilization, active query surge, and contention to trigger the Observe → Reason → Propose loop.",
+	Example: "  cortexops simulate\n" +
+		"  cortexops simulate spike\n" +
+		"  cortexops load",
+	Run: func(cmd *cobra.Command, args []string) {
+		handleSimulateLoad()
+	},
+}
+
 // 2. Decision resource command
 var decisionCmd = &cobra.Command{
 	Use:     "decision",
@@ -847,6 +861,7 @@ func init() {
 	initCmd.Flags().BoolVarP(&flagAdvancedInit, "advanced", "a", false, "Configure advanced onboarding parameters (API endpoint, AI toggles)")
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(simulateCmd)
 
 	rootCmd.AddCommand(aliasStatusCmd, aliasQueueCmd, aliasApproveCmd, aliasRejectCmd, aliasAskCmd, aliasDisconnectCmd)
 }
@@ -2479,6 +2494,99 @@ func handleClusterRemove(name string) {
 	} else {
 		fmt.Println(successStyle.Render(fmt.Sprintf("%s Cluster '%s' disconnected and removed from configuration.", iconSuccess, name)))
 	}
+}
+
+func handleSimulateLoad() {
+	apiURL := viper.GetString("api_url")
+	if apiURL == "" {
+		apiURL = "http://localhost:4000"
+	}
+
+	fmt.Println(brandMarkStyle.Render(fmt.Sprintf("%s CortexOps Anomaly Simulator & Load Generator", iconBolt)))
+	fmt.Println(subTitleStyle.Render("Injecting simulated CPU spike & query contention to test Bedrock AI reasoning..."))
+	fmt.Println()
+
+	s := startSpinner("Simulating high load on CockroachDB cluster...")
+	time.Sleep(400 * time.Millisecond)
+
+	payload := map[string]interface{}{
+		"cpu":     88.5,
+		"queries": 18,
+	}
+	bodyBytes, _ := json.Marshal(payload)
+
+	req, err := http.NewRequest("POST", strings.TrimRight(apiURL, "/")+"/simulate/spike", bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		stopSpinner(s)
+		printErrorAndExit(fmt.Sprintf("Failed to create simulation request: %v", err), "")
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	stopSpinner(s)
+
+	if err != nil {
+		printErrorAndExit(fmt.Sprintf("Failed to connect to orchestrator API: %v", err), "Ensure node-orchestrator is running (./start.sh)")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		printErrorAndExit(fmt.Sprintf("Simulation failed (HTTP %d): %s", resp.StatusCode, string(respBody)), "")
+	}
+
+	var result struct {
+		Status    string `json:"status"`
+		Situation string `json:"situation"`
+		Decision  struct {
+			ID            string  `json:"id"`
+			ActionType    string  `json:"action_type"`
+			ReasoningText string  `json:"reasoning_text"`
+			Confidence    float64 `json:"confidence"`
+			CcloudCommand string  `json:"ccloud_command"`
+			CreatedAt     string  `json:"created_at"`
+		} `json:"decision"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		printErrorAndExit(fmt.Sprintf("Failed to parse response: %v", err), "")
+	}
+
+	idShort := result.Decision.ID
+	if len(idShort) > 8 {
+		idShort = idShort[:8]
+	}
+
+	fmt.Println(successStyle.Render(fmt.Sprintf("%s Anomaly Detected & Synthesized by AI Agent!", iconSuccess)))
+	fmt.Println()
+
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorYellow).
+		Padding(1, 2).
+		Width(76)
+
+	cardContent := fmt.Sprintf(
+		"%s %s  %s  %s\n\n"+
+			"%s\n%s\n\n"+
+			"%s\n%s\n\n"+
+			"%s\n%s",
+		cmdNameStyle.Render("PROPOSED ACTION:"),
+		warningStyle.Render(strings.ToUpper(result.Decision.ActionType)),
+		lipgloss.NewStyle().Bold(true).Foreground(colorCyan).Render(fmt.Sprintf("%.0f%% Confidence", result.Decision.Confidence*100)),
+		lipgloss.NewStyle().Foreground(colorSlate).Render("(id: "+idShort+")"),
+		lipgloss.NewStyle().Bold(true).Foreground(colorCyan).Render("Reasoning:"),
+		lipgloss.NewStyle().Width(70).Render(result.Decision.ReasoningText),
+		lipgloss.NewStyle().Bold(true).Foreground(colorYellow).Render("Recommended Gated Action:"),
+		lipgloss.NewStyle().Foreground(colorSlate).Render("$ "+result.Decision.CcloudCommand),
+		lipgloss.NewStyle().Bold(true).Foreground(colorGreen).Render("Next Action:"),
+		"Review on Web Dashboard or run 'cortexops queue' to approve!",
+	)
+
+	fmt.Println(boxStyle.Render(cardContent))
+	fmt.Println()
+	fmt.Printf("👉 Run %s or %s to authorize!\n", cmdNameStyle.Render("cortexops approve "+idShort), cmdNameStyle.Render("cortexops queue"))
 }
 
 func main() {

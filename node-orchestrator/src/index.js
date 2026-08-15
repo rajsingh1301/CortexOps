@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { embed, reason } from "./bedrock.js";
-import { listDecisions, similarDecisions, setDecisionStatus, recordOutcome, getDecisionById, getLatestSnapshot } from "./db.js";
+import { listDecisions, similarDecisions, setDecisionStatus, recordOutcome, getDecisionById, getLatestSnapshot, insertDecision } from "./db.js";
 
 const app = express();
 app.use(cors());
@@ -153,6 +153,53 @@ app.get("/search", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /simulate/spike — Simulates a high CPU / active query spike & triggers AI Agent
+app.post("/simulate/spike", async (req, res) => {
+  try {
+    const cpu = req.body.cpu || 88.5;
+    const queries = req.body.queries || 18;
+    const situation = `Critical CPU spike to ${cpu}% with ${queries} active queries exceeding threshold`;
+    const mcpContext = {
+      cpu_percent: cpu,
+      active_queries: queries,
+      contention_events: 2,
+      replication_status: "healthy",
+      captured_at: new Date().toISOString()
+    };
+    const relevantSkills = [
+      {
+        name: "performance-and-scaling",
+        body: "Guidance: When sustained CPU usage exceeds 75% for > 10m correlated with query load increase, recommend scaling up cluster nodes (+1)."
+      }
+    ];
+
+    const queryEmbedding = await embed(situation);
+    const similarPastDecisions = await similarDecisions(queryEmbedding, 2);
+    const aiDecision = await reason({ mcpContext, relevantSkills, similarPastDecisions });
+    const decisionEmbedding = await embed(aiDecision.reasoningText || "");
+
+    const newDecision = await insertDecision({
+      actionType: aiDecision.actionType || "scale_up",
+      triggerSource: "anomaly_detector",
+      reasoningText: aiDecision.reasoningText || `Sustained CPU spiked to ${cpu}% with ${queries} active queries. Synthesizing performance-and-scaling skill guidance: scaling up node count.`,
+      embedding: decisionEmbedding,
+      confidence: aiDecision.confidence || 0.92,
+      ccloudCommand: aiDecision.ccloudCommand || "ccloud cluster scale --nodes +1 --cluster infra-historian-demo",
+      status: "proposed"
+    });
+
+    return res.json({
+      status: "simulated_anomaly_created",
+      situation,
+      mcpContext,
+      decision: newDecision
+    });
+  } catch (err) {
+    console.error("Simulation endpoint error:", err);
+    return res.status(500).json({ error: err.message });
   }
 });
 

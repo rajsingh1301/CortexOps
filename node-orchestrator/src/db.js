@@ -86,4 +86,23 @@ export async function getLatestSnapshot() {
   return rows[0];
 }
 
+export async function insertDecision({
+  actionType,
+  triggerSource = "anomaly_detector",
+  reasoningText,
+  embedding,
+  confidence = 0.9,
+  ccloudCommand = null,
+  status = "proposed"
+}) {
+  const vectorStr = Array.isArray(embedding) ? `[${embedding.join(",")}]` : embedding;
+  const { rows } = await pool.query(
+    `INSERT INTO decisions (action_type, trigger_source, reasoning_text, embedding, confidence, ccloud_command, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, action_type, trigger_source, reasoning_text, confidence, ccloud_command, status, created_at`,
+    [actionType, triggerSource, reasoningText, vectorStr, confidence, ccloudCommand, status]
+  );
+  return rows[0];
+}
+
 
