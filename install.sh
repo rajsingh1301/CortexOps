@@ -18,6 +18,7 @@ if command -v go >/dev/null 2>&1; then
     echo "📦 Compiling latest cortexops with Go..."
     git clone --depth 1 https://github.com/rajsingh1301/CortexOps.git "${TMP_DIR}/cortexops-repo"
     cd "${TMP_DIR}/cortexops-repo/go-agent"
+    go mod tidy 2>/dev/null || true
     go build -o "${INSTALL_DIR}/cortexops" ./cmd/cortexops/
     cp -f "${INSTALL_DIR}/cortexops" "${HOME}/go/bin/cortexops" 2>/dev/null || true
     chmod +x "${INSTALL_DIR}/cortexops"
@@ -59,11 +60,12 @@ echo ""
 echo "✨ CortexOps CLI installed successfully!"
 echo ""
 
-# Launch CortexOps immediately in the current interactive shell
-if [ -c /dev/tty ]; then
-    export PATH="${INSTALL_DIR}:${HOME}/go/bin:${PATH}"
-    exec "${INSTALL_DIR}/cortexops" "$@" < /dev/tty
-else
-    export PATH="${INSTALL_DIR}:${HOME}/go/bin:${PATH}"
+# Launch CortexOps immediately
+export PATH="${INSTALL_DIR}:${HOME}/go/bin:/usr/local/bin:${PATH}"
+if [ -t 0 ]; then
     exec "${INSTALL_DIR}/cortexops" "$@"
+elif { exec < /dev/tty; } 2>/dev/null; then
+    exec "${INSTALL_DIR}/cortexops" "$@"
+else
+    "${INSTALL_DIR}/cortexops" "$@" || true
 fi
