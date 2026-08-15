@@ -529,6 +529,22 @@ var clusterSwitchCmd = &cobra.Command{
 	},
 }
 
+var clusterRemoveCmd = &cobra.Command{
+	Use:     "remove [cluster_name]",
+	Aliases: []string{"rm", "delete", "disconnect"},
+	Short:   "Disconnect and remove a configured cluster profile",
+	Long:    "Removes a CockroachDB cluster configuration from ~/.cortexops/config.yaml.",
+	Example: "  cortexops cluster remove default-cluster\n" +
+		"  cortexops cluster disconnect",
+	Run: func(cmd *cobra.Command, args []string) {
+		name := ""
+		if len(args) > 0 {
+			name = args[0]
+		}
+		handleClusterRemove(name)
+	},
+}
+
 // 1.1 Init / Onboard command
 var initCmd = &cobra.Command{
 	Use:     "init",
@@ -540,6 +556,19 @@ var initCmd = &cobra.Command{
 		"  cortexops onboard",
 	Run: func(cmd *cobra.Command, args []string) {
 		runOnboardingWizard(flagAdvancedInit)
+	},
+}
+
+var aliasDisconnectCmd = &cobra.Command{
+	Use:     "disconnect [cluster_name]",
+	Aliases: []string{"remove"},
+	Short:   "Alias for 'cluster remove'",
+	Run: func(cmd *cobra.Command, args []string) {
+		name := ""
+		if len(args) > 0 {
+			name = args[0]
+		}
+		handleClusterRemove(name)
 	},
 }
 
@@ -792,7 +821,7 @@ func init() {
 		return nil
 	}
 
-	clusterCmd.AddCommand(clusterHealthCmd, clusterListCmd, clusterAddCmd, clusterSwitchCmd)
+	clusterCmd.AddCommand(clusterHealthCmd, clusterListCmd, clusterAddCmd, clusterSwitchCmd, clusterRemoveCmd)
 	rootCmd.AddCommand(clusterCmd)
 
 	decisionCmd.AddCommand(decisionListCmd, decisionApproveCmd, decisionRejectCmd)
@@ -808,7 +837,7 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(versionCmd)
 
-	rootCmd.AddCommand(aliasStatusCmd, aliasQueueCmd, aliasApproveCmd, aliasRejectCmd, aliasAskCmd)
+	rootCmd.AddCommand(aliasStatusCmd, aliasQueueCmd, aliasApproveCmd, aliasRejectCmd, aliasAskCmd, aliasDisconnectCmd)
 }
 
 // ============================================================================
@@ -2267,6 +2296,88 @@ func handleClusterSwitch(name string) {
 		fmt.Println(string(data))
 	} else {
 		fmt.Println(successStyle.Render(fmt.Sprintf("%s Switched active cluster to '%s'", iconSuccess, name)))
+	}
+}
+
+func handleClusterRemove(name string) {
+	clustersMap := viper.GetStringMap("clusters")
+	if len(clustersMap) == 0 {
+		// If no named clusters but api_url exists, allow resetting
+		if viper.GetString("api_url") != "" {
+			viper.Set("api_url", "")
+			viper.Set("active_cluster", "")
+			viper.Set("onboarding_completed", false)
+			if err := viper.WriteConfig(); err != nil {
+				_ = viper.SafeWriteConfig()
+			}
+			fmt.Println(successStyle.Render(fmt.Sprintf("%s Disconnected from default cluster.", iconSuccess)))
+			return
+		}
+		printErrorAndExit("No clusters configured to disconnect", "Run 'cortexops init' to connect a cluster")
+	}
+
+	if name == "" && isTTY {
+		options := make([]huh.Option[string], 0, len(clustersMap))
+		for cName := range clustersMap {
+			options = append(options, huh.NewOption(cName, cName))
+		}
+
+		selectForm := huh.NewSelect[string]().
+			Title("Select CockroachDB cluster to disconnect/remove:").
+			Options(options...).
+			Value(&name)
+
+		if err := selectForm.Run(); err != nil || name == "" {
+			fmt.Println(subTitleStyle.Render("Cluster removal cancelled."))
+			return
+		}
+	}
+
+	if name == "" {
+		printErrorAndExit("Cluster name required", "Usage: cortexops cluster remove <name>")
+	}
+
+	if _, exists := clustersMap[name]; !exists {
+		printErrorAndExit(fmt.Sprintf("Cluster '%s' not found", name), "Run 'cortexops cluster list' to see available clusters")
+	}
+
+	delete(clustersMap, name)
+	viper.Set("clusters", clustersMap)
+
+	activeCluster := viper.GetString("active_cluster")
+	if activeCluster == name {
+		newActive := ""
+		for k := range clustersMap {
+			newActive = k
+			break
+		}
+		viper.Set("active_cluster", newActive)
+		if newActive != "" {
+			if m, ok := clustersMap[newActive].(map[string]interface{}); ok {
+				if u, ok := m["api_url"].(string); ok {
+					viper.Set("api_url", u)
+				}
+			}
+		} else {
+			viper.Set("api_url", "")
+			viper.Set("onboarding_completed", false)
+		}
+	}
+
+	if err := viper.WriteConfig(); err != nil {
+		_ = viper.SafeWriteConfig()
+	}
+	_ = os.Chmod(getConfigFileLocation(), 0600)
+
+	outFormat := getEffectiveOutputFormat()
+	if outFormat == "json" {
+		data, _ := json.Marshal(map[string]string{
+			"status":  "removed",
+			"cluster": name,
+		})
+		fmt.Println(string(data))
+	} else {
+		fmt.Println(successStyle.Render(fmt.Sprintf("%s Cluster '%s' disconnected and removed from configuration.", iconSuccess, name)))
 	}
 }
 
