@@ -12,6 +12,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,6 +33,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/common-nighthawk/go-figure"
+	"github.com/rajsingh1301/CortexOps/go-agent/directdb"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
@@ -268,6 +270,51 @@ func getEffectiveOutputFormat() string {
 		return strings.ToLower(envOut)
 	}
 	return strings.ToLower(viper.GetString("output"))
+}
+
+func getActiveConnString() string {
+	if env := os.Getenv("COCKROACH_CONN_STRING"); env != "" {
+		return env
+	}
+	activeCluster := viper.GetString("active_cluster")
+	if activeCluster != "" {
+		key := fmt.Sprintf("clusters.%s.conn_str", activeCluster)
+		if s := viper.GetString(key); s != "" {
+			return s
+		}
+		key2 := fmt.Sprintf("clusters.%s.conn_string", activeCluster)
+		if s := viper.GetString(key2); s != "" {
+			return s
+		}
+	}
+	if s := viper.GetString("conn_str"); s != "" {
+		return s
+	}
+	if s := viper.GetString("conn_string"); s != "" {
+		return s
+	}
+	return ""
+}
+
+func getDirectDBClient() (*directdb.Client, error) {
+	connStr := getActiveConnString()
+	if connStr == "" {
+		return nil, fmt.Errorf("no CockroachDB connection string configured (run 'cortexops init')")
+	}
+	return directdb.NewClient(context.Background(), connStr)
+}
+
+func isDaemonAvailable(apiURL string) bool {
+	if apiURL == "" {
+		return false
+	}
+	client := &http.Client{Timeout: 600 * time.Millisecond}
+	resp, err := client.Get(apiURL + "/cluster/health")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }
 
 // ============================================================================
@@ -922,15 +969,42 @@ type decisionActionCompletedMsg struct {
 func fetchDecisionsCmd() tea.Cmd {
 	return func() tea.Msg {
 		apiURL := getEffectiveAPIURL()
-		resp, err := http.Get(apiURL + "/decisions?status=proposed")
+		client := &http.Client{Timeout: 800 * time.Millisecond}
+		resp, err := client.Get(apiURL + "/decisions?status=proposed")
+		if err == nil && resp.StatusCode == http.StatusOK {
+			defer resp.Body.Close()
+			var listData []Decision
+			if err := json.NewDecoder(resp.Body).Decode(&listData); err == nil {
+				return decisionsLoadedMsg{decisions: listData}
+			}
+		}
+
+		// Direct CockroachDB Fallback
+		dbClient, dbErr := getDirectDBClient()
+		if dbErr != nil {
+			return decisionsLoadedMsg{err: dbErr}
+		}
+		defer dbClient.Close()
+
+		rows, err := dbClient.ListDecisions(context.Background(), "proposed", 50)
 		if err != nil {
 			return decisionsLoadedMsg{err: err}
 		}
-		defer resp.Body.Close()
 
 		var listData []Decision
-		if err := json.NewDecoder(resp.Body).Decode(&listData); err != nil {
-			return decisionsLoadedMsg{err: err}
+		for _, r := range rows {
+			listData = append(listData, Decision{
+				ID:              r.ID,
+				ActionType:      r.ActionType,
+				TriggerSource:   r.TriggerSource,
+				ReasoningText:   r.ReasoningText,
+				Confidence:      r.Confidence,
+				CcloudCommand:   r.CcloudCommand,
+				Status:          r.Status,
+				Outcome:         r.Outcome,
+				CreatedAt:       r.CreatedAt.Format(time.RFC3339),
+				SkillsConsulted: r.SkillsConsulted,
+			})
 		}
 		return decisionsLoadedMsg{decisions: listData}
 	}
@@ -939,15 +1013,28 @@ func fetchDecisionsCmd() tea.Cmd {
 func executeDecisionCmd(action, id string) tea.Cmd {
 	return func() tea.Msg {
 		apiURL := getEffectiveAPIURL()
+		client := &http.Client{Timeout: 1200 * time.Millisecond}
 		url := fmt.Sprintf("%s/decisions/%s/%s", apiURL, id, action)
-		resp, err := http.Post(url, "application/json", nil)
+		resp, err := client.Post(url, "application/json", nil)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			defer resp.Body.Close()
+			return decisionActionCompletedMsg{action: action, id: id}
+		}
+
+		// Direct CockroachDB Fallback
+		dbClient, dbErr := getDirectDBClient()
+		if dbErr != nil {
+			return decisionActionCompletedMsg{action: action, id: id, err: dbErr}
+		}
+		defer dbClient.Close()
+
+		if action == "approve" {
+			_, err = dbClient.ApproveDecision(context.Background(), id, "Approved and executed directly via CortexOps SQL client")
+		} else {
+			_, err = dbClient.RejectDecision(context.Background(), id)
+		}
 		if err != nil {
 			return decisionActionCompletedMsg{action: action, id: id, err: err}
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return decisionActionCompletedMsg{action: action, id: id, err: fmt.Errorf("HTTP %d", resp.StatusCode)}
 		}
 		return decisionActionCompletedMsg{action: action, id: id}
 	}
@@ -1224,54 +1311,65 @@ func handleVersionJSON() {
 
 func handleClusterHealth() {
 	apiURL := getEffectiveAPIURL()
-	s := startSpinner("Fetching cluster telemetry from node-orchestrator...")
+	s := startSpinner("Fetching cluster telemetry...")
 
-	resp, err := http.Get(apiURL + "/cluster/health")
+	var health ClusterHealth
+	var sourceMode string
+
+	// 1. Try Daemon API with quick timeout
+	daemonClient := &http.Client{Timeout: 700 * time.Millisecond}
+	resp, err := daemonClient.Get(apiURL + "/cluster/health")
+	if err == nil && resp.StatusCode == http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err := json.Unmarshal(bodyBytes, &health); err == nil {
+			sourceMode = "Orchestrator Daemon (:4000)"
+		}
+	}
+
+	// 2. Direct CockroachDB Fallback if Daemon is offline
+	if sourceMode == "" {
+		dbClient, dbErr := getDirectDBClient()
+		if dbErr != nil {
+			stopSpinner(s)
+			printErrorAndExit(
+				fmt.Sprintf("Failed to fetch telemetry: %v", dbErr),
+				"Run 'cortexops init' to configure your CockroachDB connection string, or start node-orchestrator.",
+			)
+		}
+		defer dbClient.Close()
+
+		snap, snapErr := dbClient.GetClusterHealth(context.Background())
+		if snapErr != nil {
+			stopSpinner(s)
+			printErrorAndExit(fmt.Sprintf("Direct CockroachDB query failed: %v", snapErr), "Check network connectivity to your CockroachDB cluster.")
+		}
+
+		health = ClusterHealth{
+			CPUPercent:        snap.CPUPercent,
+			ActiveQueries:     snap.ActiveQueries,
+			ContentionEvents:  snap.ContentionEvents,
+			ReplicationStatus: snap.ReplicationStatus,
+			CapturedAt:        snap.CapturedAt.Format(time.RFC3339),
+		}
+		sourceMode = "Direct CockroachDB SQL"
+	}
+
 	stopSpinner(s)
-
-	if err != nil {
-		printErrorAndExit(
-			fmt.Sprintf("Failed to connect to CortexOps API at %s: %v", apiURL, err),
-			"Is node-orchestrator running? Start services with './start.sh' or set CORTEXOPS_API_URL.",
-		)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		printErrorAndExit(fmt.Sprintf("Failed to read API response: %v", err), "")
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		printErrorAndExit(
-			fmt.Sprintf("API returned HTTP %d: %s", resp.StatusCode, string(bodyBytes)),
-			"Check node-orchestrator service logs.",
-		)
-	}
 
 	outFormat := getEffectiveOutputFormat()
 	if outFormat == "json" {
-		var rawObj interface{}
-		if err := json.Unmarshal(bodyBytes, &rawObj); err == nil {
-			prettyJSON, _ := json.MarshalIndent(rawObj, "", "  ")
-			fmt.Println(string(prettyJSON))
-		} else {
-			fmt.Println(string(bodyBytes))
-		}
+		prettyJSON, _ := json.MarshalIndent(health, "", "  ")
+		fmt.Println(string(prettyJSON))
 		return
-	}
-
-	var health ClusterHealth
-	if err := json.Unmarshal(bodyBytes, &health); err != nil {
-		printErrorAndExit(fmt.Sprintf("Failed to parse cluster health JSON: %v", err), "")
 	}
 
 	activeQueries := parseIntVal(health.ActiveQueries)
 	contentionEvents := parseIntVal(health.ContentionEvents)
 
 	if flagQuiet || outFormat == "plain" {
-		fmt.Printf("cpu=%.1f%% active_queries=%d contention_events=%d replication=%s safety_gate=active\n",
-			health.CPUPercent, activeQueries, contentionEvents, health.ReplicationStatus)
+		fmt.Printf("cpu=%.1f%% active_queries=%d contention_events=%d replication=%s safety_gate=active mode=%s\n",
+			health.CPUPercent, activeQueries, contentionEvents, health.ReplicationStatus, sourceMode)
 		return
 	}
 
@@ -1297,13 +1395,18 @@ func handleClusterHealth() {
 			[]string{"Contention Events", fmt.Sprintf("%d events", contentionEvents)},
 			[]string{"Replication Status", repStr},
 			[]string{"Safety Gate", safetyStr},
+			[]string{"Connection Mode", lipgloss.NewStyle().Bold(true).Foreground(colorCyan).Render(sourceMode)},
 		)
 
 	if health.CapturedAt != "" {
 		t.Row("Last Telemetry Sync", subTitleStyle.Render(health.CapturedAt))
 	}
 
-	fmt.Println(brandMarkStyle.Render(fmt.Sprintf("🪲 CortexOps Cluster Health · %s", getEffectiveAPIURL())))
+	activeCluster := viper.GetString("active_cluster")
+	if activeCluster == "" {
+		activeCluster = "default"
+	}
+	fmt.Println(brandMarkStyle.Render(fmt.Sprintf("🪲 CortexOps Cluster Health · %s", activeCluster)))
 	fmt.Println(t)
 	fmt.Println()
 }
@@ -1315,33 +1418,68 @@ func handleDecisionListStatic() {
 		targetStatus = flagStatus
 	}
 
-	s := startSpinner("Fetching decision queue...")
-	endpoint := fmt.Sprintf("%s/decisions?status=%s", apiURL, url.QueryEscape(targetStatus))
-	resp, err := http.Get(endpoint)
-	stopSpinner(s)
-
-	if err != nil {
-		printErrorAndExit(
-			fmt.Sprintf("Failed to fetch decisions from %s: %v", apiURL, err),
-			"Ensure node-orchestrator is running or check API endpoint.",
-		)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		printErrorAndExit(fmt.Sprintf("Failed to read decision response: %v", err), "")
-	}
-
-	var decisionsList []Decision
-	if err := json.Unmarshal(bodyBytes, &decisionsList); err != nil {
-		printErrorAndExit(fmt.Sprintf("Failed to parse decision list: %v", err), "")
-	}
-
 	limit := viper.GetInt("default_limit")
 	if flagLimit > 0 {
 		limit = flagLimit
 	}
+	if limit <= 0 {
+		limit = 50
+	}
+
+	s := startSpinner("Fetching decision queue...")
+
+	var decisionsList []Decision
+	var sourceMode string
+
+	// 1. Try Daemon API
+	daemonClient := &http.Client{Timeout: 800 * time.Millisecond}
+	endpoint := fmt.Sprintf("%s/decisions?status=%s", apiURL, url.QueryEscape(targetStatus))
+	resp, err := daemonClient.Get(endpoint)
+	if err == nil && resp.StatusCode == http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err := json.Unmarshal(bodyBytes, &decisionsList); err == nil {
+			sourceMode = "Orchestrator Daemon (:4000)"
+		}
+	}
+
+	// 2. Direct CockroachDB Fallback
+	if sourceMode == "" {
+		dbClient, dbErr := getDirectDBClient()
+		if dbErr != nil {
+			stopSpinner(s)
+			printErrorAndExit(
+				fmt.Sprintf("Failed to fetch decisions: %v", dbErr),
+				"Run 'cortexops init' to configure your CockroachDB connection string, or start node-orchestrator.",
+			)
+		}
+		defer dbClient.Close()
+
+		rows, err := dbClient.ListDecisions(context.Background(), targetStatus, limit)
+		if err != nil {
+			stopSpinner(s)
+			printErrorAndExit(fmt.Sprintf("Direct CockroachDB query failed: %v", err), "")
+		}
+
+		for _, r := range rows {
+			decisionsList = append(decisionsList, Decision{
+				ID:              r.ID,
+				ActionType:      r.ActionType,
+				TriggerSource:   r.TriggerSource,
+				ReasoningText:   r.ReasoningText,
+				Confidence:      r.Confidence,
+				CcloudCommand:   r.CcloudCommand,
+				Status:          r.Status,
+				Outcome:         r.Outcome,
+				CreatedAt:       r.CreatedAt.Format(time.RFC3339),
+				SkillsConsulted: r.SkillsConsulted,
+			})
+		}
+		sourceMode = "Direct CockroachDB SQL"
+	}
+
+	stopSpinner(s)
+
 	if limit > 0 && len(decisionsList) > limit {
 		decisionsList = decisionsList[:limit]
 	}
@@ -1372,7 +1510,7 @@ func handleDecisionListStatic() {
 		return
 	}
 
-	fmt.Println(brandMarkStyle.Render(fmt.Sprintf("📋 Decision Queue (status: %s, count: %d)", targetStatus, len(decisionsList))))
+	fmt.Println(brandMarkStyle.Render(fmt.Sprintf("📋 Decision Queue · %s (status: %s, count: %d)", sourceMode, targetStatus, len(decisionsList))))
 
 	t := table.New().
 		Border(lipgloss.RoundedBorder()).
@@ -1412,15 +1550,42 @@ func handleDecisionListStatic() {
 
 func fetchProposedDecisions() ([]Decision, error) {
 	apiURL := getEffectiveAPIURL()
-	resp, err := http.Get(apiURL + "/decisions?status=proposed")
+	client := &http.Client{Timeout: 800 * time.Millisecond}
+	resp, err := client.Get(apiURL + "/decisions?status=proposed")
+	if err == nil && resp.StatusCode == http.StatusOK {
+		defer resp.Body.Close()
+		var listData []Decision
+		if err := json.NewDecoder(resp.Body).Decode(&listData); err == nil {
+			return listData, nil
+		}
+	}
+
+	// Direct CockroachDB Fallback
+	dbClient, dbErr := getDirectDBClient()
+	if dbErr != nil {
+		return nil, dbErr
+	}
+	defer dbClient.Close()
+
+	rows, err := dbClient.ListDecisions(context.Background(), "proposed", 50)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	var listData []Decision
-	if err := json.NewDecoder(resp.Body).Decode(&listData); err != nil {
-		return nil, err
+	for _, r := range rows {
+		listData = append(listData, Decision{
+			ID:              r.ID,
+			ActionType:      r.ActionType,
+			TriggerSource:   r.TriggerSource,
+			ReasoningText:   r.ReasoningText,
+			Confidence:      r.Confidence,
+			CcloudCommand:   r.CcloudCommand,
+			Status:          r.Status,
+			Outcome:         r.Outcome,
+			CreatedAt:       r.CreatedAt.Format(time.RFC3339),
+			SkillsConsulted: r.SkillsConsulted,
+		})
 	}
 	return listData, nil
 }
@@ -1439,7 +1604,7 @@ func handleDecisionApprove(id string) {
 				fmt.Println(infoStyle.Render(fmt.Sprintf("%s No pending proposed decisions to approve.", iconInfo)))
 				return
 			}
-			printErrorAndExit(fmt.Sprintf("Failed to load decisions: %v", err), "Ensure node-orchestrator is running.")
+			printErrorAndExit(fmt.Sprintf("Failed to load decisions: %v", err), "Ensure CockroachDB connection string is configured.")
 		}
 
 		options := make([]huh.Option[string], len(decisions))
@@ -1482,45 +1647,68 @@ func handleDecisionApprove(id string) {
 		printErrorAndExit("Decision ID is required", "Usage: cortexops approve <decision_id>\nOr run interactively in a TTY terminal.")
 	}
 
-	s := startSpinner(fmt.Sprintf("Approving & executing decision %s via safety gate...", id))
-	resp, err := http.Post(fmt.Sprintf("%s/decisions/%s/approve", apiURL, id), "application/json", nil)
-	stopSpinner(s)
+	s := startSpinner(fmt.Sprintf("Approving & executing decision %s...", id))
 
-	if err != nil {
-		printErrorAndExit(
-			fmt.Sprintf("Failed to contact API for approval: %v", err),
-			"Is node-orchestrator running? Check network connection.",
-		)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		printErrorAndExit(
-			fmt.Sprintf("Approval failed (HTTP %d): %s", resp.StatusCode, string(bodyBytes)),
-			"Verify the decision ID exists and check go-agent /execute safety logs.",
-		)
-	}
-
-	outFormat := getEffectiveOutputFormat()
-	if outFormat == "json" {
-		fmt.Println(string(bodyBytes))
-		return
-	}
-
-	var result struct {
+	type approveResult struct {
 		ID      string `json:"id"`
 		Status  string `json:"status"`
 		Outcome string `json:"outcome"`
+		Mode    string `json:"mode"`
 	}
-	_ = json.Unmarshal(bodyBytes, &result)
 
-	if flagQuiet || outFormat == "plain" {
-		fmt.Printf("id=%s status=%s outcome=%s\n", result.ID, result.Status, result.Outcome)
+	var result approveResult
+
+	// 1. Try Daemon API
+	daemonClient := &http.Client{Timeout: 1200 * time.Millisecond}
+	resp, err := daemonClient.Post(fmt.Sprintf("%s/decisions/%s/approve", apiURL, id), "application/json", nil)
+	if err == nil && resp.StatusCode == http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		_ = json.Unmarshal(bodyBytes, &result)
+		result.Mode = "Orchestrator Daemon"
+	}
+
+	// 2. Direct CockroachDB Fallback
+	if result.Status == "" {
+		dbClient, dbErr := getDirectDBClient()
+		if dbErr != nil {
+			stopSpinner(s)
+			printErrorAndExit(
+				fmt.Sprintf("Approval failed: %v", dbErr),
+				"Run 'cortexops init' to configure your CockroachDB connection string, or start node-orchestrator.",
+			)
+		}
+		defer dbClient.Close()
+
+		updated, err := dbClient.ApproveDecision(context.Background(), id, "Approved and recorded directly via CortexOps SQL client")
+		if err != nil {
+			stopSpinner(s)
+			printErrorAndExit(fmt.Sprintf("Direct SQL approval failed: %v", err), "Verify that the decision ID exists.")
+		}
+
+		result = approveResult{
+			ID:      updated.ID,
+			Status:  updated.Status,
+			Outcome: updated.Outcome,
+			Mode:    "Direct CockroachDB SQL",
+		}
+	}
+
+	stopSpinner(s)
+
+	outFormat := getEffectiveOutputFormat()
+	if outFormat == "json" {
+		prettyJSON, _ := json.MarshalIndent(result, "", "  ")
+		fmt.Println(string(prettyJSON))
 		return
 	}
 
-	fmt.Println(successStyle.Render(fmt.Sprintf("%s Decision Approved and Executed Successfully!", iconSuccess)))
+	if flagQuiet || outFormat == "plain" {
+		fmt.Printf("id=%s status=%s outcome=%s mode=%s\n", result.ID, result.Status, result.Outcome, result.Mode)
+		return
+	}
+
+	fmt.Println(successStyle.Render(fmt.Sprintf("%s Decision Approved and Executed Successfully! (%s)", iconSuccess, result.Mode)))
 	fmt.Printf("  %s %s\n", boldStyle.Render("Status: "), successStyle.Render(result.Status))
 	fmt.Printf("  %s %s\n\n", boldStyle.Render("Outcome:"), cmdNameStyle.Render(result.Outcome))
 }
@@ -1539,7 +1727,7 @@ func handleDecisionReject(id string) {
 				fmt.Println(infoStyle.Render(fmt.Sprintf("%s No pending proposed decisions to reject.", iconInfo)))
 				return
 			}
-			printErrorAndExit(fmt.Sprintf("Failed to load decisions: %v", err), "Ensure node-orchestrator is running.")
+			printErrorAndExit(fmt.Sprintf("Failed to load decisions: %v", err), "Ensure CockroachDB connection string is configured.")
 		}
 
 		options := make([]huh.Option[string], len(decisions))
@@ -1583,28 +1771,56 @@ func handleDecisionReject(id string) {
 	}
 
 	s := startSpinner(fmt.Sprintf("Rejecting decision %s...", id))
-	resp, err := http.Post(fmt.Sprintf("%s/decisions/%s/reject", apiURL, id), "application/json", nil)
+
+	type rejectResult struct {
+		ID     string `json:"id"`
+		Status string `json:"status"`
+		Mode   string `json:"mode"`
+	}
+
+	var result rejectResult
+
+	// 1. Try Daemon API
+	daemonClient := &http.Client{Timeout: 1200 * time.Millisecond}
+	resp, err := daemonClient.Post(fmt.Sprintf("%s/decisions/%s/reject", apiURL, id), "application/json", nil)
+	if err == nil && resp.StatusCode == http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		_ = json.Unmarshal(bodyBytes, &result)
+		result.Mode = "Orchestrator Daemon"
+	}
+
+	// 2. Direct CockroachDB Fallback
+	if result.Status == "" {
+		dbClient, dbErr := getDirectDBClient()
+		if dbErr != nil {
+			stopSpinner(s)
+			printErrorAndExit(
+				fmt.Sprintf("Rejection failed: %v", dbErr),
+				"Run 'cortexops init' to configure your CockroachDB connection string, or start node-orchestrator.",
+			)
+		}
+		defer dbClient.Close()
+
+		updated, err := dbClient.RejectDecision(context.Background(), id)
+		if err != nil {
+			stopSpinner(s)
+			printErrorAndExit(fmt.Sprintf("Direct SQL rejection failed: %v", err), "Verify that the decision ID exists.")
+		}
+
+		result = rejectResult{
+			ID:     updated.ID,
+			Status: updated.Status,
+			Mode:   "Direct CockroachDB SQL",
+		}
+	}
+
 	stopSpinner(s)
-
-	if err != nil {
-		printErrorAndExit(
-			fmt.Sprintf("Failed to contact API for rejection: %v", err),
-			"Ensure node-orchestrator API is reachable.",
-		)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		printErrorAndExit(
-			fmt.Sprintf("Rejection failed (HTTP %d): %s", resp.StatusCode, string(bodyBytes)),
-			"Verify that decision ID exists.",
-		)
-	}
 
 	outFormat := getEffectiveOutputFormat()
 	if outFormat == "json" {
-		fmt.Println(string(bodyBytes))
+		prettyJSON, _ := json.MarshalIndent(result, "", "  ")
+		fmt.Println(string(prettyJSON))
 		return
 	}
 
@@ -1613,7 +1829,7 @@ func handleDecisionReject(id string) {
 		return
 	}
 
-	fmt.Println(errorStyle.Render(fmt.Sprintf("%s Decision marked as Rejected.", iconError)) + "\n")
+	fmt.Println(errorStyle.Render(fmt.Sprintf("%s Decision %s marked as Rejected in CockroachDB (%s)", iconError, id[:8], result.Mode)) + "\n")
 }
 
 func handleMemorySearch(query string) {
@@ -1637,34 +1853,57 @@ func handleMemorySearch(query string) {
 	}
 
 	s := startSpinner(fmt.Sprintf("Searching operational memory for \"%s\"...", query))
-	searchURL := fmt.Sprintf("%s/search?q=%s", apiURL, url.QueryEscape(query))
-	resp, err := http.Get(searchURL)
-	stopSpinner(s)
-
-	if err != nil {
-		printErrorAndExit(
-			fmt.Sprintf("Vector search failed: %v", err),
-			"Check node-orchestrator API connection.",
-		)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		printErrorAndExit(fmt.Sprintf("Failed to read search response: %v", err), "")
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		printErrorAndExit(
-			fmt.Sprintf("Search API returned HTTP %d: %s", resp.StatusCode, string(bodyBytes)),
-			"Check vector search backend logs.",
-		)
-	}
 
 	var searchResp SearchResponse
-	if err := json.NewDecoder(bytes.NewBuffer(bodyBytes)).Decode(&searchResp); err != nil {
-		printErrorAndExit(fmt.Sprintf("Failed to parse search response: %v", err), "")
+	var searchMode string
+
+	// 1. Try Vector Search via Daemon
+	daemonClient := &http.Client{Timeout: 1500 * time.Millisecond}
+	searchURL := fmt.Sprintf("%s/search?q=%s", apiURL, url.QueryEscape(query))
+	resp, err := daemonClient.Get(searchURL)
+	if err == nil && resp.StatusCode == http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err := json.NewDecoder(bytes.NewBuffer(bodyBytes)).Decode(&searchResp); err == nil {
+			searchMode = "Vector Cosine Semantic Search (Bedrock AI)"
+		}
 	}
+
+	// 2. Direct CockroachDB Keyword/Text Matching Fallback
+	if searchMode == "" {
+		dbClient, dbErr := getDirectDBClient()
+		if dbErr != nil {
+			stopSpinner(s)
+			printErrorAndExit(
+				fmt.Sprintf("Search failed: %v", dbErr),
+				"Run 'cortexops init' to configure your CockroachDB connection string, or start node-orchestrator.",
+			)
+		}
+		defer dbClient.Close()
+
+		rows, err := dbClient.SearchDecisionsText(context.Background(), query, 5)
+		if err != nil {
+			stopSpinner(s)
+			printErrorAndExit(fmt.Sprintf("Direct search query failed: %v", err), "")
+		}
+
+		searchResp.Question = query
+		for _, r := range rows {
+			searchResp.Matches = append(searchResp.Matches, SearchMatch{
+				ID:            r.ID,
+				ActionType:    r.ActionType,
+				ReasoningText: r.ReasoningText,
+				Confidence:    r.Confidence,
+				CcloudCommand: r.CcloudCommand,
+				Status:        r.Status,
+				Outcome:       r.Outcome,
+				CreatedAt:     r.CreatedAt.Format(time.RFC3339),
+			})
+		}
+		searchMode = "Direct CockroachDB SQL Text Search"
+	}
+
+	stopSpinner(s)
 
 	limit := 5
 	if flagLimit > 0 {
