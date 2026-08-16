@@ -389,23 +389,25 @@ func parseIntVal(v interface{}) int {
 func getQuickClusterStatus() (bool, string) {
 	apiURL := getEffectiveAPIURL()
 	client := http.Client{
-		Timeout: 1500 * time.Millisecond,
+		Timeout: 400 * time.Millisecond,
 	}
 	resp, err := client.Get(apiURL + "/cluster/health")
-	if err != nil {
-		if strings.Contains(apiURL, "localhost") {
-			fallbackURL := strings.Replace(apiURL, "localhost", "127.0.0.1", 1)
-			if resp2, err2 := client.Get(fallbackURL + "/cluster/health"); err2 == nil {
-				defer resp2.Body.Close()
-				if resp2.StatusCode == http.StatusOK {
-					return true, apiURL
-				}
-			}
-		}
-		return false, apiURL
+	if err == nil && resp.StatusCode == http.StatusOK {
+		resp.Body.Close()
+		return true, apiURL
 	}
-	defer resp.Body.Close()
-	return resp.StatusCode == http.StatusOK, apiURL
+
+	// Check Direct CockroachDB configuration
+	activeCluster := viper.GetString("active_cluster")
+	if connStr := getActiveConnString(); connStr != "" {
+		display := activeCluster
+		if display == "" {
+			display = "CockroachDB Direct"
+		}
+		return true, display
+	}
+
+	return false, "run 'cortexops init'"
 }
 
 func renderLandingScreen(cmd *cobra.Command) {
@@ -418,19 +420,19 @@ func renderLandingScreen(cmd *cobra.Command) {
 	}
 
 	// 2. Status / Health & Version Indicator Pill
-	connected, apiURL := getQuickClusterStatus()
+	connected, clusterInfo := getQuickClusterStatus()
 	var statusLine string
 	if connected {
 		statusLine = fmt.Sprintf("%s %s %s %s",
 			lipgloss.NewStyle().Bold(true).Foreground(colorGreen).Render("● Connected to cluster"),
-			lipgloss.NewStyle().Foreground(colorSlate).Render("("+apiURL+")"),
+			lipgloss.NewStyle().Foreground(colorSlate).Render("("+clusterInfo+")"),
 			lipgloss.NewStyle().Foreground(colorSlate).Render("·"),
 			lipgloss.NewStyle().Bold(true).Foreground(colorWhite).Render(cliVersion),
 		)
 	} else {
 		statusLine = fmt.Sprintf("%s %s %s %s",
 			lipgloss.NewStyle().Bold(true).Foreground(colorCrimson).Render("○ Not connected"),
-			lipgloss.NewStyle().Foreground(colorSlate).Render("("+apiURL+")"),
+			lipgloss.NewStyle().Foreground(colorSlate).Render("("+clusterInfo+")"),
 			lipgloss.NewStyle().Foreground(colorSlate).Render("·"),
 			lipgloss.NewStyle().Bold(true).Foreground(colorWhite).Render(cliVersion),
 		)
