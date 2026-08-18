@@ -689,7 +689,7 @@ var simulateCmd = &cobra.Command{
 		"  cortexops simulate spike\n" +
 		"  cortexops load",
 	Run: func(cmd *cobra.Command, args []string) {
-		handleSimulateLoad()
+		handleSimulateLoad(args)
 	},
 }
 
@@ -2802,10 +2802,46 @@ func handleClusterRemove(name string) {
 	}
 }
 
-func handleSimulateLoad() {
+func handleSimulateLoad(args []string) {
+	subCmd := "spike"
+	if len(args) > 0 {
+		subCmd = strings.ToLower(args[0])
+	}
+
 	apiURL := viper.GetString("api_url")
 	if apiURL == "" {
 		apiURL = "http://localhost:4000"
+	}
+
+	if subCmd == "calm" || subCmd == "reset" || subCmd == "normal" || subCmd == "low" {
+		fmt.Println(brandMarkStyle.Render(fmt.Sprintf("%s CortexOps Telemetry Reset", iconBolt)))
+		fmt.Println(subTitleStyle.Render("Reducing cluster CPU load back to normal calm baseline (8.5%)..."))
+		fmt.Println()
+
+		s := startSpinner("Resetting telemetry snapshot...")
+		time.Sleep(300 * time.Millisecond)
+
+		req, err := http.NewRequest("POST", strings.TrimRight(apiURL, "/")+"/simulate/calm", nil)
+		if err != nil {
+			stopSpinner(s)
+			printErrorAndExit(fmt.Sprintf("Failed to create request: %v", err), "")
+		}
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		stopSpinner(s)
+
+		if err != nil {
+			printErrorAndExit(fmt.Sprintf("Failed to connect to orchestrator: %v", err), "")
+		}
+		defer resp.Body.Close()
+
+		fmt.Println(successStyle.Render(fmt.Sprintf("%s Cluster CPU Load Reduced Successfully!", iconSuccess)))
+		fmt.Println(boldStyle.Render("  CPU Load:        8.5% (Calm / Normal)"))
+		fmt.Println(subTitleStyle.Render("  Active Queries:  2 queries"))
+		fmt.Println(subTitleStyle.Render("  Replication:     ✓ HEALTHY"))
+		fmt.Println()
+		fmt.Println(subTitleStyle.Render("Run 'cortexops status' to inspect."))
+		return
 	}
 
 	fmt.Println(brandMarkStyle.Render(fmt.Sprintf("%s CortexOps Anomaly Simulator & Load Generator", iconBolt)))

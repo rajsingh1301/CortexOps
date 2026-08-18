@@ -281,6 +281,41 @@ app.post("/simulate/spike", async (req, res) => {
   }
 });
 
+// POST /simulate/calm — Resets telemetry to normal low CPU baseline
+app.post(["/simulate/calm", "/simulate/reset"], async (req, res) => {
+  try {
+    const cpu = req.body.cpu || 8.5;
+    const queries = req.body.queries || 2;
+    const mcpContext = {
+      cpu_percent: cpu,
+      active_queries: queries,
+      contention_events: 0,
+      replication_status: "healthy",
+      captured_at: new Date().toISOString()
+    };
+
+    await insertSnapshot({
+      cpuPercent: cpu,
+      activeQueries: queries,
+      contentionEvents: 0,
+      replicationStatus: "healthy",
+      raw: mcpContext
+    }).catch(err => console.error("Error inserting calm snapshot:", err.message));
+
+    return res.json({
+      status: "cluster_telemetry_reset",
+      cpu_percent: cpu,
+      active_queries: queries,
+      contention_events: 0,
+      replication_status: "healthy",
+      message: "Cluster CPU returned to normal calm baseline (8.5%)."
+    });
+  } catch (err) {
+    console.error("Reset telemetry error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`orchestrator api listening on :${port}`);
