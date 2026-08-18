@@ -25,7 +25,7 @@ import DecisionCard from '../components/DecisionCard';
 import MemorySearch from '../components/MemorySearch';
 import ClusterMetrics from '../components/ClusterMetrics';
 
-const API_BASE = 'http://localhost:4000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('feed');

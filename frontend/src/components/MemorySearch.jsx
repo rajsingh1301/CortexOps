@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Search, Loader2, Sparkles, X, BrainCircuit, AlertCircle, Sparkle } from 'lucide-react';
 import DecisionCard from './DecisionCard';
 
-const API_BASE = 'http://localhost:4000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 const SUGGESTIONS = [
   "why did you take a backup?",
