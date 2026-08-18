@@ -10,48 +10,37 @@ export default function CortexOpsLogo({ size = 22, className = '', style = {} })
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, ...style }}
-      aria-label="CortexOps Logo"
+      aria-label="CortexOps Cluster Sentinel Logo"
     >
-      {/* Terminal Command Chevron & Prompt Base */}
+      {/* Outer Hexagonal Distributed Cluster Mesh */}
       <path 
-        d="M4.5 5.5L10.5 11.5L4.5 17.5" 
-        stroke="var(--logdy-orange)" 
-        strokeWidth="2.2" 
+        d="M12 2.5L20.5 7.5V16.5L12 21.5L3.5 16.5V7.5L12 2.5Z" 
+        stroke="var(--logdy-cyan)" 
+        strokeWidth="1.8" 
         strokeLinecap="round" 
         strokeLinejoin="round"
       />
+
+      {/* Internal Distributed Raft Synaptic Nodes */}
       <path 
-        d="M11 18.5H19" 
-        stroke="var(--logdy-orange)" 
-        strokeWidth="2.2" 
+        d="M12 2.5V8.5M20.5 16.5L15 13.5M3.5 16.5L9 13.5" 
+        stroke="var(--logdy-cyan)" 
+        strokeWidth="1.5" 
         strokeLinecap="round"
-      />
-      
-      {/* Synaptic Neural Vector Lines */}
-      <line 
-        x1="10.5" 
-        y1="11.5" 
-        x2="14" 
-        y2="6.5" 
-        stroke="var(--logdy-cyan)" 
-        strokeWidth="1.4" 
-        strokeDasharray="2 2"
-        strokeOpacity="0.9"
-      />
-      <line 
-        x1="14" 
-        y1="6.5" 
-        x2="19.5" 
-        y2="10.5" 
-        stroke="var(--logdy-cyan)" 
-        strokeWidth="1.4"
         strokeOpacity="0.8"
       />
 
-      {/* Neural Synaptic Nodes */}
-      <circle cx="14" cy="6.5" r="2.2" fill="var(--logdy-cyan)" />
-      <circle cx="19.5" cy="10.5" r="1.6" fill="var(--logdy-cyan)" />
-      <circle cx="14" cy="6.5" r="0.9" fill="#ffffff" />
+      {/* Cluster Node Vertices */}
+      <circle cx="12" cy="2.5" r="1.2" fill="var(--logdy-cyan)" />
+      <circle cx="20.5" cy="16.5" r="1.2" fill="var(--logdy-cyan)" />
+      <circle cx="3.5" cy="16.5" r="1.2" fill="var(--logdy-cyan)" />
+
+      {/* Central AI Decision & Ops Sentinel Core */}
+      <polygon 
+        points="12,8.5 15.5,14 8.5,14" 
+        fill="var(--logdy-orange)"
+      />
+      <circle cx="12" cy="12.2" r="1.2" fill="#ffffff" />
     </svg>
   );
 }
