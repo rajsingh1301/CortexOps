@@ -1,197 +1,254 @@
-# CortexOPS
+# CortexOps
 
-An AI agent that manages its own CockroachDB cluster — and remembers, semantically, why it made every decision.
+> **Autonomous, AI-Assisted Operations & Vector Semantic Decision Memory Agent for CockroachDB Clusters**
 
-Built for the CockroachDB × AWS Hackathon (Build with Agentic Memory).
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://golang.org)
+[![React](https://img.shields.io/badge/Frontend-React%2019-61DAFB?logo=react)](https://react.dev)
+[![CockroachDB](https://img.shields.io/badge/Database-CockroachDB%20Vector-6933FF?logo=cockroachlabs)](https://www.cockroachlabs.com)
+[![AWS Bedrock](https://img.shields.io/badge/AI-Amazon%20Bedrock%20Claude%203.5-FF9900?logo=amazonaws)](https://aws.amazon.com/bedrock/)
 
-## The Idea
+---
 
-Most "agent + database" hackathon projects use the database as a passive memory store for
-some unrelated product. This project is deliberately self-referential: the agent's job is
-to operate a CockroachDB cluster (via the `ccloud` CLI, guided by CockroachDB's own Agent
-Skills), and every decision it makes — and the reasoning behind it — is embedded and stored
-back in that same cluster. Ask it "why did you take a backup on Tuesday" and it retrieves
-the actual reasoning, not a guess.
+## 🔗 Demo Links
 
-## CockroachDB Tools Used
+- 🌐 **Live Web Application:** [[DEMO_URL_HERE]]([DEMO_URL_HERE])
+- 🎥 **Video Walkthrough (YouTube/Vimeo):** [[DEMO_VIDEO_URL_HERE]]([DEMO_VIDEO_URL_HERE])
 
-| Tool | Role |
-|---|---|
-| **Managed MCP Server** | Read-only introspection — cluster health, query stats, contention — before any decision is made |
-| **Agent Skills Repo** | The agent's operating procedure — consulted before every consequential action |
-| **ccloud CLI** | The agent's "hands" — provisions backups, checks health, scaling actions |
-| **Distributed Vector Indexing** | The decision journal — semantic search over the agent's own operational history |
+---
 
-## AWS Services Used
+## 💡 What It Does
 
-| Service | Role |
-|---|---|
-| **Bedrock** | Reasoning (Claude 3.5 Sonnet) + Embeddings (Cohere embed-english-v3) |
-| **Lambda** | Scheduled trigger for the observe → reason → log loop |
-| **CloudWatch** | Optional external signal correlation |
+Operating distributed databases like CockroachDB at scale requires continuous monitoring, deep domain expertise, and rapid incident remediation. However, database operations face three critical challenges:
 
-## Repo Layout
+1. **Context Loss & Amnesia:** When an operator scales a cluster, drops an index, or adjusts zone configurations during an outage, the rationale is lost in chat logs or memory. Future engineers cannot answer *"Why did we make this decision?"*
+2. **Alert Fatigue & Remediation Delay:** Spikes in CPU or lock contention require manual query analysis and CLI commands, delaying recovery.
+3. **Unsafe Autonomous Execution:** Traditional automated scripts lack domain guardrails and safety verification, risking catastrophic schema locks or unintended drop actions.
+
+### The CortexOps Solution
+**CortexOps** is an autonomous, AI-assisted operations agent that continuously observes CockroachDB telemetry, diagnoses anomalies using specialized **CockroachDB Agent Skills**, formulates human-in-the-loop remediation proposals, executes them through a **strict whitelist Safety Gate**, and writes every decision's reasoning into CockroachDB using **Distributed Vector Indexing**. 
+
+Whenever an engineer asks natural-language questions (e.g. `cortexops ask "why did you scale up the cluster on Tuesday?"`), CortexOps performs semantic cosine similarity search directly against CockroachDB's vector store to provide instant, auditable answers.
+
+---
+
+## 🪲 CockroachDB Integration
+
+CortexOps natively integrates with CockroachDB core infrastructure across four specialized layers:
+
+### 1. Model Context Protocol (MCP) Server Integration
+- The Go agent connects to CockroachDB MCP servers (`go-agent/mcp/client.go`) to query live cluster health, active statement diagnostics, and range distribution metrics safely without exposing root database credentials.
+
+### 2. Distributed Vector Indexing (C-SPANN Cosine Search)
+- Decisions and their reasoning narratives are converted into **1024-dimensional vector embeddings** and stored directly inside CockroachDB in the `infra_historian.decisions` table:
+  ```sql
+  CREATE TABLE IF NOT EXISTS decisions (
+      id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      action_type      STRING NOT NULL,
+      reasoning_text   STRING NOT NULL,
+      embedding        VECTOR(1024),
+      confidence       FLOAT,
+      status           STRING NOT NULL DEFAULT 'proposed',
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  CREATE VECTOR INDEX IF NOT EXISTS decisions_embedding_idx
+      ON decisions (embedding vector_cosine_ops);
+  ```
+- Natural language queries from the CLI (`cortexops ask`) and Web Dashboard execute real-time cosine distance searches (`ORDER BY embedding <-> $1 LIMIT 5`) over CockroachDB's distributed vector index.
+
+### 3. CockroachDB Agent Skills
+- CortexOps embeds specialized, domain-specific CockroachDB Agent Skills (`.agents/skills/`):
+  - `performance-and-scaling`: Guidelines for node scaling, hot range mitigation, and CPU anomaly handling.
+  - `query-and-schema-design`: Detection of unindexed queries, lock contention, and schema change storage risks.
+  - `operations-and-lifecycle`: Quorum monitoring, backup/restore schedules, and rolling version upgrades.
+  - `auditing-cis-benchmark`: CIS CockroachDB benchmark Level 1 security hardening.
+- These skills are dynamically injected into Bedrock AI prompts to ground all operational proposals in verified CockroachDB best practices.
+
+### 4. `ccloud` CLI Remediation Execution
+- When human operators approve proposed actions, CortexOps invokes the CockroachDB Cloud CLI (`ccloud cluster scale`, `ccloud cluster backup`) with strict argument parsing and exit-code validation (`go-agent/ccloud/runner.go`).
+
+---
+
+## ☁️ AWS Integration
+
+CortexOps uses AWS services for intelligence, serverless execution, and operational observability:
+
+### 1. Amazon Bedrock (Claude 3.5 Sonnet & Cohere Embeddings)
+- **Reasoning Engine:** Calls `anthropic.claude-3-5-sonnet-20241022-v2:0` via the AWS Bedrock Runtime SDK to evaluate cluster snapshots against CockroachDB Agent Skills and formulate structured remediation runbooks.
+- **Embedding Generation:** Uses `cohere.embed-english-v3` (or `amazon.titan-embed-text-v2:0`) to generate 1024-dimension float vectors for both operational decisions and operator search queries.
+
+### 2. AWS Lambda
+- Serverless event listener and scheduled telemetry handler (`go-agent/cmd/lambda/main.go`) that triggers autonomous health checks and anomaly evaluations.
+
+### 3. Amazon CloudWatch
+- Telemetry emitter (`go-agent/monitoring/cloudwatch.go`) that exports cluster CPU usage, lock contention counters, and decision execution metrics to AWS CloudWatch for enterprise monitoring.
+
+---
+
+## 🏗️ Architecture Overview
 
 ```
-cortexOps/
-├── db/
-│   ├── schema.sql           # CockroachDB schema (decisions, command log, skill invocations, snapshots)
-│   └── seed.sql             # Sample rows for local testing
-├── go-agent/                # Go service: MCP client + ccloud wrapper + skill loader (port 5005)
-│   ├── main.go
-│   ├── main_test.go         # Safety whitelist unit tests
-│   ├── cmd/
-│   │   ├── cortexops/       # Production TUI CLI (Cobra, Viper, Lipgloss, Huh, Spinner)
-│   │   └── lambda/          # AWS Lambda handler entrypoint
-│   ├── core/                # Shared observe-reason cycle logic
-│   ├── monitoring/          # CloudWatch custom metrics publisher
-│   ├── mcp/client.go        # CockroachDB Managed MCP Server client (Bearer auth)
-│   ├── ccloud/wrapper.go    # Whitelisted ccloud CLI actions (backup, scale_up, schema_review, no_action)
-│   ├── skills/loader.go     # Agent Skills YAML loader
-│   └── decisions/store.go   # CockroachDB vector decision storage
-├── node-orchestrator/       # Node.js: Bedrock calls + orchestration + API (port 4000)
-│   └── src/
-│       ├── index.js         # Express API (POST /reason, GET /decisions, approve/reject, /search)
-│       ├── bedrock.js       # AWS Bedrock SDK (Claude reasoning + Cohere embeddings)
-│       └── db.js            # CockroachDB pg client + vector similarity search
-├── frontend/                # React dashboard (port 5173)
-│   └── src/
-│       ├── App.jsx          # Main app with tabs (Decision Feed, Memory Search)
-│       └── components/
-│           ├── ClusterMetrics.jsx   # Live cluster health indicators
-│           ├── DecisionCard.jsx     # AI decision cards with Approve/Reject
-│           └── MemorySearch.jsx     # "Why did you...?" vector search
-├── docs/
-│   └── architecture.md
-├── start.sh                 # One-command launcher for all 3 services
-└── todo.md                  # Implementation progress tracker
+ ┌────────────────────────────────────────────────────────┐
+ │            CockroachDB Cloud Cluster                   │
+ │  - Relational Data & Telemetry Tables                  │
+ │  - VECTOR(1024) Journal (C-SPANN Cosine Index)         │
+ └──────────────────────────┬─────────────────────────────┘
+                            │
+              1. Telemetry / MCP Context
+                            ▼
+ ┌────────────────────────────────────────────────────────┐
+ │           Node.js & Go Orchestration Engine            │
+ │  - Telemetry Observe Loop & Anomaly Detection          │
+ │  - CockroachDB Agent Skills Evaluation                 │
+ └──────────────────────────┬─────────────────────────────┘
+                            │
+               2. Synthesize with Context & Skills
+                            ▼
+ ┌────────────────────────────────────────────────────────┐
+ │               Amazon Bedrock AI                        │
+ │  - Claude 3.5 Sonnet (Reasoning & Runbook Generation)  │
+ │  - Cohere / Titan Embeddings (1024-dim Vector)         │
+ └──────────────────────────┬─────────────────────────────┘
+                            │
+               3. Propose Decision & Embed
+                            ▼
+ ┌────────────────────────────────────────────────────────┐
+ │       Operator Approval & Safety Whitelist Gate        │
+ │  - Go-Agent Whitelist Gate (:5005)                     │
+ │  - Standalone Terminal CLI (Bubbletea / Cobra)         │
+ │  - React Operator Web Dashboard (Render / Vercel)      │
+ └──────────────────────────┬─────────────────────────────┘
+                            │
+               4. Approve & Execute
+                            ▼
+ ┌────────────────────────────────────────────────────────┐
+ │               CockroachDB ccloud CLI                   │
+ │  - Scale Node Pools, Trigger Backups, Adjust Zone      │
+ └────────────────────────────────────────────────────────┘
 ```
 
-## Quick Start
+> Placeholder for Visual Architecture Diagram:
+> 
+> `![CortexOps Architecture]([ARCHITECTURE_DIAGRAM_URL_HERE])`
 
-### One-Command Launch
+---
+
+## 🚀 Setup & Run Instructions
+
+### Prerequisites
+- **Go:** `1.22` or `1.25+` installed
+- **Node.js:** `18.x` or `20.x+` (for orchestrator and frontend)
+- **CockroachDB:** Connection string to a Serverless or Dedicated cluster (v24.x+ with vector indexing support)
+- **AWS Account:** *(Optional)* AWS Credentials with access to Amazon Bedrock (`Claude 3.5 Sonnet` and `Cohere Embed English v3`). A built-in offline smart fallback engine is enabled by default if AWS credentials are not configured.
+
+---
+
+### 1. Installation
+
+#### Method A: 1-Line Universal Global Installer (macOS & Linux)
 ```bash
+curl -sSL https://raw.githubusercontent.com/rajsingh1301/CortexOps/main/install.sh | bash
+```
+
+#### Method B: Go Global Install
+```bash
+go install github.com/rajsingh1301/CortexOps/go-agent/cmd/cortexops@latest
+```
+
+#### Method C: Build from Source
+```bash
+# Clone the repository
+git clone https://github.com/rajsingh1301/CortexOps.git
+cd CortexOps/go-agent
+
+# Build and install local binary
+make build-cli
+make install
+```
+
+---
+
+### 2. Configuration & Onboarding
+
+Run the interactive onboarding wizard to connect your CockroachDB cluster:
+```bash
+cortexops init
+```
+
+For advanced configuration (custom orchestrator API URL, Bedrock model IDs):
+```bash
+cortexops init --advanced
+```
+
+---
+
+### 3. Verify & Operate
+
+```bash
+# 1. Inspect cluster health and connection status
+cortexops status
+
+# 2. Launch live 2-second auto-refreshing terminal dashboard
+cortexops status --watch
+
+# 3. View pending AI-proposed decisions in interactive TUI
+cortexops queue
+
+# 4. Approve an operational proposal
+cortexops approve <decision-id>
+
+# 5. Query vector semantic memory using natural language
+cortexops ask "why did you scale up the cluster?"
+```
+
+---
+
+### 4. Running the Web Dashboard Locally
+
+```bash
+# Start all services (Frontend, Node Orchestrator, Go Safety Gate)
 ./start.sh
 ```
-This starts all 3 services — go-agent (:5005), node-orchestrator (:4000), frontend (:5173).
+- Open **Web Dashboard:** `http://localhost:5173/dashboard`
+- Open **Interactive Docs:** `http://localhost:5173/docs`
 
 ---
 
-## 💻 `cortexops` TUI CLI Tool
+## ⚙️ Example Configuration
 
-CortexOps includes a production-grade Command-Line Interface (`cortexops`) built with **Cobra**, **Viper**, **Lipgloss**, **Huh**, and **Spinner**.
+CortexOps reads configuration from `~/.cortexops/config.yaml` or root `.env` variables:
 
-### Building & Installing the CLI
-```bash
-cd go-agent
-make build-cli
-make install # Installs globally to ~/.local/bin/cortexops
+```yaml
+# ~/.cortexops/config.yaml
+active_cluster: primary-cockroachdb
+clusters:
+  primary-cockroachdb:
+    connection_string: "postgresql://user:password@host:26257/infra_historian?sslmode=verify-full"
+    label: "Primary Production Cluster"
+api_url: "http://localhost:4000"
+output: "table"
+no_color: false
+default_limit: 20
 ```
 
-### Complete CLI Command Directory
-
-```bash
-# ----------------------------------------------------------------------------
-# 1. ONBOARDING & SETUP WIZARD
-# ----------------------------------------------------------------------------
-cortexops init               # 2-step setup: Connection URL & Cluster Name
-cortexops init --advanced    # 4-step setup: Includes custom API URL & AI assist toggle
-cortexops onboard            # Alias for init
-
-# ----------------------------------------------------------------------------
-# 2. CLUSTER MANAGEMENT
-# ----------------------------------------------------------------------------
-cortexops cluster get-health # Inspect live cluster CPU, queries, contention & safety gate
-cortexops status             # Alias for cluster get-health
-cortexops status --watch     # Live 2-second auto-refreshing TUI dashboard
-cortexops status -o json     # Automation-friendly JSON output
-
-cortexops cluster list       # List all configured CockroachDB clusters with active indicator
-cortexops cluster ls         # Alias for cluster list
-cortexops cluster add        # Interactively connect and validate a new cluster
-cortexops cluster switch <name>  # Switch active CockroachDB cluster profile
-cortexops cluster remove <name>  # Disconnect and delete a cluster configuration
-cortexops disconnect         # Interactive cluster disconnect menu
-
-# ----------------------------------------------------------------------------
-# 3. DECISION APPROVALS & REMEDIATION QUEUE
-# ----------------------------------------------------------------------------
-cortexops decision list      # Interactive Bubbletea TUI list of proposed AI remediations
-cortexops queue              # Alias for decision list (use [a] approve, [r] reject)
-cortexops queue --limit 3    # Limit displayed items
-
-cortexops decision approve <id>  # Authorize decision ID and execute whitelisted action
-cortexops approve <id>           # Alias for decision approve (interactive if ID omitted)
-
-cortexops decision reject <id>   # Reject decision without executing command
-cortexops reject <id>            # Alias for decision reject (interactive if ID omitted)
-
-# ----------------------------------------------------------------------------
-# 4. OPERATIONAL VECTOR MEMORY SEARCH
-# ----------------------------------------------------------------------------
-cortexops memory search "why did you scale up?"  # Semantic cosine similarity search
-cortexops ask "why did you take a backup?"       # Alias for memory search
-cortexops ask                                    # Opens interactive search prompt
-
-# ----------------------------------------------------------------------------
-# 5. CONFIGURATION MANAGEMENT (~/.cortexops/config.yaml, mode 0600)
-# ----------------------------------------------------------------------------
-cortexops config view        # Display effective configuration and active path
-cortexops config get api_url # Get a specific config value
-cortexops config set default_limit 10 # Persist a config setting
-
-# ----------------------------------------------------------------------------
-# 6. GLOBAL FLAGS & UTILITIES
-# ----------------------------------------------------------------------------
-cortexops --help             # Command help
-cortexops version            # Version and active connected endpoint
-cortexops completion zsh     # Shell autocompletion generator (zsh/bash/fish)
-```
+Refer to [`.env.example`](file:///.env.example) for environment variable templates.
 
 ---
 
-## Architecture
+## 🛠️ Tech Stack
 
-```
-[Scheduled Trigger / Lambda / EventBridge]
-       │
-       ▼
-[go-agent :5005] ──MCP (read)──▶ [CockroachDB Cloud: Managed MCP Server]
-       │
-       ├──loads──▶ [Agent Skills (YAML)]
-       │
-       ├──POST /reason──▶ [node-orchestrator :4000] ──Bedrock──▶ [Claude 3.5 Sonnet + Cohere]
-       │                         │
-       ▼                         ▼
-[decisions.Store] ◀───── writes row (mcp_context, skills, embedding VECTOR(1024))
-       │
-       ▼
-[CockroachDB: decisions, cluster_snapshots, skill_invocations]
-       ▲                                               ▲
-       │                                               │
-[React Dashboard :5173]                  [cortexops CLI Tool]
-       │                                               │
-       └──REST API (:4000) ────────────────────────────┘
-              │
-              └──Approve──▶ node-orchestrator ──▶ go-agent /execute ──▶ ccloud CLI (whitelist-gated)
-```
+| Layer | Technologies |
+|---|---|
+| **CLI & Systems Agent** | **Go 1.25**, Cobra CLI, Charmbracelet (Bubbletea, Huh, Lipgloss), pgx |
+| **Frontend Web App** | **React 19**, Vite, Recharts, Lucide React, CSS3 Tokens |
+| **Orchestrator Backend** | **Node.js (ES Modules)**, Express, pg, `@aws-sdk/client-bedrock-runtime` |
+| **Database & Vector Store** | **CockroachDB** (Distributed C-SPANN Vector Index, `VECTOR(1024)`) |
+| **Artificial Intelligence** | **Amazon Bedrock** (Anthropic Claude 3.5 Sonnet, Cohere Embed English v3) |
+| **Cloud & Telemetry** | **AWS Lambda**, **Amazon CloudWatch**, **CockroachDB ccloud CLI** |
 
-## Safety Design
+---
 
-Every executable action is gated by a strict `switch-case` whitelist in `go-agent/main.go`:
-- `backup` → `ccloud backup create`
-- `scale_up` → `ccloud cluster scale`
-- `schema_review` → `ccloud cluster describe` (read-only)
-- `no_action` → Audit log record (no-op)
+## 📄 License
 
-Any action not in this list is rejected with `HTTP 400 Bad Request`. The LLM never constructs shell commands directly.
-
-## Running Tests
-
-```bash
-cd go-agent && go test -v ./...
-```
-
-## License
-
-Built for the CockroachDB × AWS Hackathon 2026.
+This project is licensed under the **MIT License** — see the [LICENSE](file:///LICENSE) file for details.
