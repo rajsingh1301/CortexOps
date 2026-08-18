@@ -215,6 +215,7 @@ func isOnboardingCompleted() bool {
 }
 
 func initViper() {
+	viper.Reset()
 	if configFile != "" {
 		viper.SetConfigFile(configFile)
 	} else {
@@ -383,28 +384,64 @@ func parseIntVal(v interface{}) int {
 }
 
 // ============================================================================
-// STYLED LANDING SCREEN (Run when no arguments are provided)
+// STYLED LANDING SCREEN & CONNECTION DETECTION
 // ============================================================================
 
 func getQuickClusterStatus() (bool, string) {
+	// 1. Try local or configured orchestrator daemon API with short timeout
 	apiURL := getEffectiveAPIURL()
-	client := http.Client{
-		Timeout: 400 * time.Millisecond,
-	}
-	resp, err := client.Get(apiURL + "/cluster/health")
-	if err == nil && resp.StatusCode == http.StatusOK {
-		resp.Body.Close()
-		return true, apiURL
+	if apiURL != "" {
+		client := http.Client{
+			Timeout: 500 * time.Millisecond,
+		}
+		resp, err := client.Get(apiURL + "/cluster/status")
+		if err == nil && resp.StatusCode == http.StatusOK {
+			var st struct {
+				Connected   bool   `json:"connected"`
+				ClusterName string `json:"clusterName"`
+			}
+			if json.NewDecoder(resp.Body).Decode(&st) == nil && st.Connected {
+				resp.Body.Close()
+				display := st.ClusterName
+				if display == "" {
+					display = apiURL
+				}
+				return true, display
+			}
+			resp.Body.Close()
+		}
+
+		// Also check /cluster/health
+		resp2, err2 := client.Get(apiURL + "/cluster/health")
+		if err2 == nil && resp2.StatusCode == http.StatusOK {
+			var h struct {
+				Connected         *bool  `json:"connected"`
+				ReplicationStatus string `json:"replication_status"`
+			}
+			if json.NewDecoder(resp2.Body).Decode(&h) == nil {
+				if (h.Connected == nil || *h.Connected) && h.ReplicationStatus != "disconnected" {
+					resp2.Body.Close()
+					return true, apiURL
+				}
+			}
+			resp2.Body.Close()
+		}
 	}
 
-	// Check Direct CockroachDB configuration
-	activeCluster := viper.GetString("active_cluster")
-	if connStr := getActiveConnString(); connStr != "" {
-		display := activeCluster
-		if display == "" {
-			display = "CockroachDB Direct"
+	// 2. Check Direct CockroachDB connection string from config or env
+	connStr := getActiveConnString()
+	if connStr != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 2000*time.Millisecond)
+		defer cancel()
+		dbClient, err := directdb.NewClient(ctx, connStr)
+		if err == nil {
+			dbClient.Close()
+			activeCluster := viper.GetString("active_cluster")
+			if activeCluster == "" {
+				activeCluster = "CockroachDB Direct"
+			}
+			return true, activeCluster
 		}
-		return true, display
 	}
 
 	return false, "run 'cortexops init'"
@@ -514,6 +551,16 @@ var rootCmd = &cobra.Command{
 			handleVersionJSON()
 			return
 		}
+
+		// Fast Cluster Connection Check
+		connected, _ := getQuickClusterStatus()
+		if !connected {
+			// If not connected to any valid cluster, seamlessly launch onboarding wizard
+			runOnboardingWizard(false)
+			return
+		}
+
+		// If connected, render the standard landing screen with commands/aliases/flags
 		renderLandingScreen(cmd)
 	},
 }
@@ -862,6 +909,7 @@ var aliasAskCmd = &cobra.Command{
 }
 
 func init() {
+	cobra.OnInitialize(initViper)
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "", "Output format (table|json|plain)")
 	rootCmd.PersistentFlags().BoolVarP(&flagQuiet, "quiet", "q", false, "Output essential identifiers only")
 	rootCmd.PersistentFlags().BoolVar(&flagNoColor, "no-color", false, "Disable ANSI color formatting")
@@ -2283,14 +2331,24 @@ func saveClusterConfig(name, apiURL, connStr string, aiEnabled bool, markOnboard
 }
 
 func runOnboardingWizard(advanced bool) {
-	if !isTTY || flagQuiet || getEffectiveOutputFormat() == "json" {
+	if flagQuiet || getEffectiveOutputFormat() == "json" {
 		return
 	}
 
-	// 1. Dynamic Terminal Width calculation for clean border wrapping
+	// 1. Prominent Large ASCII Banner (go-figure "standard" font)
+	fig := figure.NewFigure("CortexOps", "standard", true)
+	if !flagNoColor && !viper.GetBool("no_color") {
+		fmt.Println(brandMarkStyle.Render(fig.String()))
+	} else {
+		fmt.Println(fig.String())
+	}
+
+	// 2. Dynamic Terminal Width calculation for clean border wrapping
 	termWidth := 80
-	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
-		termWidth = w
+	if isTTY {
+		if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+			termWidth = w
+		}
 	}
 	boxWidth := termWidth - 4
 	if boxWidth < 40 {
@@ -2299,7 +2357,7 @@ func runOnboardingWizard(advanced bool) {
 		boxWidth = 76
 	}
 
-	// 2. Welcome Banner with dynamic width and wrapped description
+	// 3. Welcome Banner with dynamic width and wrapped description
 	welcomeHeader := brandMarkStyle.Render("🚀 CortexOps — Cluster Onboarding Wizard")
 	welcomeSub := subTitleStyle.Width(boxWidth - 6).Render("Connect your CockroachDB cluster and initialize autonomous AI operations in seconds.")
 
@@ -2312,6 +2370,13 @@ func runOnboardingWizard(advanced bool) {
 		Render(welcomeHeader + "\n" + welcomeSub)
 
 	fmt.Println(welcomeBox)
+
+	// If not an interactive TTY terminal, provide clean command instructions
+	if !isTTY {
+		fmt.Println(lipgloss.NewStyle().Foreground(colorCyan).Render("Run 'cortexops init' in an interactive terminal to complete cluster onboarding."))
+		fmt.Println()
+		return
+	}
 
 	// Defaults
 	connStr := ""
