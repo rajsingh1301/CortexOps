@@ -431,7 +431,7 @@ export default function DashboardPage() {
       )}
 
       {/* Live Cluster Health Metrics Bar */}
-      <ClusterMetrics metrics={clusterMetrics} pendingCount={proposedDecisions.length} />
+      <ClusterMetrics isConnected={clusterStatus.connected} metrics={clusterMetrics} pendingCount={proposedDecisions.length} />
 
       {/* Main Section Navigation */}
       <div style={{ 

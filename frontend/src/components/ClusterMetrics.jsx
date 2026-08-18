@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Cpu, 
   Activity, 
@@ -23,36 +23,43 @@ import {
   ReferenceLine 
 } from 'recharts';
 
-// Generate 20 baseline points for the last 60 minutes
-const generateInitialHistory = (baseCpu = 22.5, baseQueries = 5) => {
+// Generate 20 baseline points for history
+const generateInitialHistory = (baseCpu = null, baseQueries = null) => {
   const points = [];
   const now = Date.now();
+  const isZero = baseCpu === null || baseCpu === undefined;
   for (let i = 19; i >= 0; i--) {
     const t = new Date(now - i * 3 * 60 * 1000);
     const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const noiseCpu = (Math.sin(i * 0.8) * 6) + (Math.random() * 4 - 2);
-    const noiseQueries = Math.max(1, Math.round(baseQueries + (Math.cos(i * 0.5) * 3) + (Math.random() * 2 - 1)));
     points.push({
       time: timeStr,
-      cpu: Math.max(8, Math.min(95, parseFloat((baseCpu + noiseCpu).toFixed(1)))),
-      queries: noiseQueries,
-      contention: i === 5 ? 1 : 0,
-      replication: 100
+      cpu: isZero ? 0 : Math.max(8, Math.min(95, parseFloat((baseCpu + (Math.sin(i * 0.8) * 6)).toFixed(1)))),
+      queries: isZero ? 0 : Math.max(1, Math.round(baseQueries + (Math.cos(i * 0.5) * 3))),
+      contention: 0,
+      replication: isZero ? 0 : 100
     });
   }
   return points;
 };
 
-export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
-  const [history, setHistory] = useState(() => generateInitialHistory(metrics?.cpu_percent, metrics?.active_queries));
-  const [currentCpu, setCurrentCpu] = useState(metrics?.cpu_percent ?? 22.5);
-  const [currentQueries, setCurrentQueries] = useState(metrics?.active_queries ?? 5);
-  const [currentContention, setCurrentContention] = useState(metrics?.contention_events ?? 0);
+export default function ClusterMetrics({ metrics, isConnected = false, pendingCount = 0 }) {
+  const [history, setHistory] = useState(() => generateInitialHistory(isConnected ? metrics?.cpu_percent : null, isConnected ? metrics?.active_queries : null));
+  const [currentCpu, setCurrentCpu] = useState(isConnected ? (metrics?.cpu_percent ?? 22.5) : null);
+  const [currentQueries, setCurrentQueries] = useState(isConnected ? (metrics?.active_queries ?? 5) : null);
+  const [currentContention, setCurrentContention] = useState(isConnected ? (metrics?.contention_events ?? 0) : 0);
   const [flashMetric, setFlashMetric] = useState(null); // 'cpu' | 'queries' | null
   const [expandedMetric, setExpandedMetric] = useState(null); // 'cpu' | 'queries' | 'replication' | 'safety' | null
 
-  // Sync when parent metrics prop updates
+  // Sync when parent metrics or isConnected prop updates
   useEffect(() => {
+    if (!isConnected) {
+      setCurrentCpu(null);
+      setCurrentQueries(null);
+      setCurrentContention(0);
+      setHistory(generateInitialHistory(null, null));
+      return;
+    }
+
     if (metrics) {
       if (typeof metrics.cpu_percent === 'number') {
         const val = parseFloat(Number(metrics.cpu_percent).toFixed(1));
@@ -69,19 +76,23 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
             replication: 100
           }];
         });
+      } else {
+        setCurrentCpu(22.5);
       }
       if (metrics.active_queries !== undefined) setCurrentQueries(parseInt(metrics.active_queries, 10) || 5);
       if (metrics.contention_events !== undefined) setCurrentContention(parseInt(metrics.contention_events, 10) || 0);
     }
-  }, [metrics]);
+  }, [metrics, isConnected]);
 
-  // Simulate periodic live ticking update (every 3.5 seconds)
+  // Periodic live ticking update only when connected
   useEffect(() => {
+    if (!isConnected || currentCpu === null) return;
+
     const interval = setInterval(() => {
       const deltaCpu = (Math.random() * 3.2 - 1.5);
       const newCpu = Math.max(10, Math.min(92, parseFloat((currentCpu + deltaCpu).toFixed(1))));
       const deltaQueries = Math.random() > 0.6 ? (Math.random() > 0.5 ? 1 : -1) : 0;
-      const newQueries = Math.max(1, currentQueries + deltaQueries);
+      const newQueries = Math.max(1, (currentQueries || 5) + deltaQueries);
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       setCurrentCpu(newCpu);
@@ -103,9 +114,12 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
     }, 3500);
 
     return () => clearInterval(interval);
-  }, [currentCpu, currentQueries, currentContention]);
+  }, [isConnected, currentCpu, currentQueries, currentContention]);
 
   const getCpuStatus = () => {
+    if (!isConnected || currentCpu === null) {
+      return { text: '○ Disconnected / Awaiting Cluster', color: 'var(--logdy-text-dim)' };
+    }
     if (currentCpu > 80) {
       return { text: '● Critical CPU Spike', color: 'var(--logdy-coral)' };
     }
@@ -119,7 +133,7 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
 
   return (
     <>
-      {/* 4 Responsive Grid Metric Cards with Sparklines */}
+      {/* 4 Responsive Grid Metric Cards */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
@@ -128,13 +142,14 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
       }}>
         {/* 1. CPU Load Card */}
         <div 
-          onClick={() => setExpandedMetric('cpu')}
+          onClick={() => isConnected && setExpandedMetric('cpu')}
           className="feature-box metric-interactive-card"
           style={{ 
             padding: '18px 20px', 
-            cursor: 'pointer',
+            cursor: isConnected ? 'pointer' : 'default',
             position: 'relative',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            opacity: isConnected ? 1 : 0.85
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -142,17 +157,17 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
               CLUSTER CPU LOAD
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Cpu size={16} color="var(--logdy-orange)" />
-              <Maximize2 size={12} color="var(--logdy-text-dim)" />
+              <Cpu size={16} color={isConnected ? "var(--logdy-orange)" : "var(--logdy-text-dim)"} />
+              {isConnected && <Maximize2 size={12} color="var(--logdy-text-dim)" />}
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
             <span 
               className={`metric-val ${flashMetric === 'cpu' ? 'metric-flash' : ''}`}
-              style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--logdy-text-heading)', fontFamily: 'var(--font-mono)' }}
+              style={{ fontSize: '1.85rem', fontWeight: 800, color: isConnected ? 'var(--logdy-text-heading)' : 'var(--logdy-text-dim)', fontFamily: 'var(--font-mono)' }}
             >
-              {typeof currentCpu === 'number' ? currentCpu.toFixed(1) : currentCpu}%
+              {isConnected && typeof currentCpu === 'number' ? `${currentCpu.toFixed(1)}%` : '-- %'}
             </span>
             <span style={{ fontSize: '0.74rem', color: cpuStatus.color, fontWeight: 700, fontFamily: 'var(--font-mono)', lineHeight: 1.3 }}>
               {cpuStatus.text}
@@ -165,11 +180,11 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
               <AreaChart data={history}>
                 <defs>
                   <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ff7a00" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#ff7a00" stopOpacity={0.0} />
+                    <stop offset="5%" stopColor={isConnected ? "#ff7a00" : "#475569"} stopOpacity={0.4} />
+                    <stop offset="95%" stopColor={isConnected ? "#ff7a00" : "#475569"} stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="cpu" stroke="#ff7a00" strokeWidth={2} fillOpacity={1} fill="url(#cpuGrad)" isAnimationActive={false} />
+                <Area type="monotone" dataKey="cpu" stroke={isConnected ? "#ff7a00" : "#475569"} strokeWidth={2} fillOpacity={1} fill="url(#cpuGrad)" isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -177,13 +192,14 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
 
         {/* 2. Active Queries Card */}
         <div 
-          onClick={() => setExpandedMetric('queries')}
+          onClick={() => isConnected && setExpandedMetric('queries')}
           className="feature-box metric-interactive-card"
           style={{ 
             padding: '18px 20px', 
-            cursor: 'pointer',
+            cursor: isConnected ? 'pointer' : 'default',
             position: 'relative',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            opacity: isConnected ? 1 : 0.85
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -191,20 +207,20 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
               ACTIVE QUERIES & LOCKS
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Activity size={16} color="var(--logdy-cyan)" />
-              <Maximize2 size={12} color="var(--logdy-text-dim)" />
+              <Activity size={16} color={isConnected ? "var(--logdy-cyan)" : "var(--logdy-text-dim)"} />
+              {isConnected && <Maximize2 size={12} color="var(--logdy-text-dim)" />}
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
             <span 
               className={`metric-val ${flashMetric === 'queries' ? 'metric-flash' : ''}`}
-              style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--logdy-text-heading)', fontFamily: 'var(--font-mono)' }}
+              style={{ fontSize: '1.85rem', fontWeight: 800, color: isConnected ? 'var(--logdy-text-heading)' : 'var(--logdy-text-dim)', fontFamily: 'var(--font-mono)' }}
             >
-              {currentQueries}
+              {isConnected && currentQueries !== null ? currentQueries : '--'}
             </span>
-            <span style={{ fontSize: '0.74rem', color: currentContention > 0 ? 'var(--logdy-coral)' : 'var(--logdy-text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)', lineHeight: 1.3 }}>
-              {currentContention} lock{currentContention !== 1 ? 's' : ''}
+            <span style={{ fontSize: '0.74rem', color: isConnected ? (currentContention > 0 ? 'var(--logdy-coral)' : 'var(--logdy-text-dim)') : 'var(--logdy-text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)', lineHeight: 1.3 }}>
+              {isConnected ? `${currentContention} lock${currentContention !== 1 ? 's' : ''}` : '○ No active feed'}
             </span>
           </div>
 
@@ -214,11 +230,11 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
               <AreaChart data={history}>
                 <defs>
                   <linearGradient id="queriesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00bcd4" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#00bcd4" stopOpacity={0.0} />
+                    <stop offset="5%" stopColor={isConnected ? "#00bcd4" : "#475569"} stopOpacity={0.4} />
+                    <stop offset="95%" stopColor={isConnected ? "#00bcd4" : "#475569"} stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="queries" stroke="#00bcd4" strokeWidth={2} fillOpacity={1} fill="url(#queriesGrad)" isAnimationActive={false} />
+                <Area type="monotone" dataKey="queries" stroke={isConnected ? "#00bcd4" : "#475569"} strokeWidth={2} fillOpacity={1} fill="url(#queriesGrad)" isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -226,13 +242,14 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
 
         {/* 3. Replication Health Card */}
         <div 
-          onClick={() => setExpandedMetric('replication')}
+          onClick={() => isConnected && setExpandedMetric('replication')}
           className="feature-box metric-interactive-card"
           style={{ 
             padding: '18px 20px', 
-            cursor: 'pointer',
+            cursor: isConnected ? 'pointer' : 'default',
             position: 'relative',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            opacity: isConnected ? 1 : 0.85
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -240,17 +257,17 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
               REPLICATION QUORUM
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Database size={16} color="var(--logdy-green)" />
-              <Maximize2 size={12} color="var(--logdy-text-dim)" />
+              <Database size={16} color={isConnected ? "var(--logdy-green)" : "var(--logdy-text-dim)"} />
+              {isConnected && <Maximize2 size={12} color="var(--logdy-text-dim)" />}
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--logdy-text-heading)', fontFamily: 'var(--font-mono)' }}>
-              Healthy
+            <span style={{ fontSize: '1.85rem', fontWeight: 800, color: isConnected ? 'var(--logdy-text-heading)' : 'var(--logdy-text-dim)', fontFamily: 'var(--font-mono)' }}>
+              {isConnected ? 'Healthy' : 'Offline'}
             </span>
-            <span style={{ fontSize: '0.74rem', color: 'var(--logdy-green)', fontWeight: 700, fontFamily: 'var(--font-mono)', lineHeight: 1.3 }}>
-              100% Range Coverage
+            <span style={{ fontSize: '0.74rem', color: isConnected ? 'var(--logdy-green)' : 'var(--logdy-text-dim)', fontWeight: 700, fontFamily: 'var(--font-mono)', lineHeight: 1.3 }}>
+              {isConnected ? '100% Range Coverage' : '○ Standby'}
             </span>
           </div>
 
@@ -260,11 +277,11 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
               <AreaChart data={history}>
                 <defs>
                   <linearGradient id="replGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                    <stop offset="5%" stopColor={isConnected ? "#10b981" : "#475569"} stopOpacity={0.4} />
+                    <stop offset="95%" stopColor={isConnected ? "#10b981" : "#475569"} stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="replication" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#replGrad)" isAnimationActive={false} />
+                <Area type="monotone" dataKey="replication" stroke={isConnected ? "#10b981" : "#475569"} strokeWidth={2} fillOpacity={1} fill="url(#replGrad)" isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -272,13 +289,14 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
 
         {/* 4. Safety Gate Card */}
         <div 
-          onClick={() => setExpandedMetric('safety')}
+          onClick={() => isConnected && setExpandedMetric('safety')}
           className="feature-box metric-interactive-card"
           style={{ 
             padding: '18px 20px', 
-            cursor: 'pointer',
+            cursor: isConnected ? 'pointer' : 'default',
             position: 'relative',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            opacity: isConnected ? 1 : 0.85
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -286,17 +304,17 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
               SAFETY GATE (:5005)
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ShieldCheck size={16} color="var(--logdy-green)" />
-              <Maximize2 size={12} color="var(--logdy-text-dim)" />
+              <ShieldCheck size={16} color={isConnected ? "var(--logdy-green)" : "var(--logdy-text-dim)"} />
+              {isConnected && <Maximize2 size={12} color="var(--logdy-text-dim)" />}
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--logdy-text-heading)', fontFamily: 'var(--font-mono)' }}>
-              Enforced
+            <span style={{ fontSize: '1.85rem', fontWeight: 800, color: isConnected ? 'var(--logdy-text-heading)' : 'var(--logdy-text-dim)', fontFamily: 'var(--font-mono)' }}>
+              {isConnected ? 'Enforced' : 'Inactive'}
             </span>
-            <span style={{ fontSize: '0.74rem', color: 'var(--logdy-orange)', fontWeight: 700, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '3px', lineHeight: 1.3 }}>
-              <Zap size={11} /> {pendingCount} Pending
+            <span style={{ fontSize: '0.74rem', color: isConnected ? 'var(--logdy-orange)' : 'var(--logdy-text-dim)', fontWeight: 700, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '3px', lineHeight: 1.3 }}>
+              {isConnected ? <><Zap size={11} /> {pendingCount} Pending</> : '○ Standby'}
             </span>
           </div>
 
@@ -307,20 +325,20 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
                 key={idx}
                 style={{
                   flex: 1,
-                  height: item.cpu > 70 ? '24px' : '12px',
-                  background: item.cpu > 70 ? 'var(--logdy-coral)' : 'rgba(16, 185, 129, 0.4)',
+                  height: isConnected ? (item.cpu > 70 ? '24px' : '12px') : '6px',
+                  background: isConnected ? (item.cpu > 70 ? 'var(--logdy-coral)' : 'rgba(16, 185, 129, 0.4)') : 'rgba(255, 255, 255, 0.08)',
                   borderRadius: '2px',
                   transition: 'all 0.3s ease'
                 }}
-                title={`${item.time}: CPU ${item.cpu}%`}
+                title={isConnected ? `${item.time}: CPU ${item.cpu}%` : 'Cluster disconnected'}
               />
             ))}
           </div>
         </div>
       </div>
 
-      {/* Expanded Detailed Time-Series Modal */}
-      {expandedMetric && (
+      {/* Expanded Detailed Time-Series Modal (when connected) */}
+      {expandedMetric && isConnected && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -416,7 +434,7 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
               <div style={{ background: 'var(--logdy-code-bg)', padding: '10px 14px', borderRadius: '6px', fontFamily: 'var(--font-mono)' }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--logdy-text-dim)' }}>CURRENT</div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--logdy-text-heading)', overflowWrap: 'break-word' }}>
-                  {expandedMetric === 'cpu' && `${currentCpu.toFixed(1)}%`}
+                  {expandedMetric === 'cpu' && `${currentCpu?.toFixed(1)}%`}
                   {expandedMetric === 'queries' && `${currentQueries} Active`}
                   {expandedMetric === 'replication' && '100% Quorum'}
                   {expandedMetric === 'safety' && ':5005 Active'}
