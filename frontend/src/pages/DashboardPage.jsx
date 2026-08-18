@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const [proposedDecisions, setProposedDecisions] = useState([]);
   const [historyDecisions, setHistoryDecisions] = useState([]);
   const [clusterMetrics, setClusterMetrics] = useState(null);
+  const [clusterStatus, setClusterStatus] = useState({ connected: false, clusterName: 'Not Connected' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
@@ -47,9 +48,13 @@ export default function DashboardPage() {
   const [actionFilter, setActionFilter] = useState('all'); // 'all' | 'scale_up' | 'backup' | 'schema_review' | 'no_action'
   const [sortOrder, setSortOrder] = useState('newest'); // 'newest' | 'oldest' | 'confidence_desc'
 
-  // Connect Modal State
+  // Connect Modal & Form State
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState(false);
+  const [inputConnString, setInputConnString] = useState('');
+  const [inputClusterLabel, setInputClusterLabel] = useState('');
+  const [isConnectingCluster, setIsConnectingCluster] = useState(false);
+  const [connectError, setConnectError] = useState(null);
 
   const addToast = (type, title, message) => {
     const id = Date.now() + Math.random();
@@ -65,31 +70,82 @@ export default function DashboardPage() {
 
   const fetchDecisions = async () => {
     setLoading(true);
-    setError(null);
     try {
-      // Fetch cluster health metrics
+      // 1. Fetch cluster status
+      const statusRes = await fetch(`${API_BASE}/cluster/status`).catch(() => null);
+      if (statusRes && statusRes.ok) {
+        const statusData = await statusRes.json();
+        setClusterStatus(statusData);
+      }
+
+      // 2. Fetch cluster health metrics
       const healthRes = await fetch(`${API_BASE}/cluster/health`).catch(() => null);
       if (healthRes && healthRes.ok) {
         const healthData = await healthRes.json();
         setClusterMetrics(healthData);
       }
 
-      // Fetch proposed decisions
-      const proposedRes = await fetch(`${API_BASE}/decisions?status=proposed`);
-      if (!proposedRes.ok) throw new Error(`HTTP ${proposedRes.status} fetching proposed decisions`);
-      const proposedData = await proposedRes.json();
-      setProposedDecisions(proposedData);
+      // 3. Fetch proposed decisions
+      const proposedRes = await fetch(`${API_BASE}/decisions?status=proposed`).catch(() => null);
+      if (proposedRes && proposedRes.ok) {
+        const proposedData = await proposedRes.json();
+        setProposedDecisions(Array.isArray(proposedData) ? proposedData : []);
+        setError(null);
+      } else if (proposedRes && !proposedRes.ok) {
+        setProposedDecisions([]);
+      }
 
-      // Fetch all decisions for history
-      const allRes = await fetch(`${API_BASE}/decisions`);
-      if (!allRes.ok) throw new Error(`HTTP ${allRes.status} fetching history`);
-      const allData = await allRes.json();
-      setHistoryDecisions(allData.filter(d => d.status !== 'proposed'));
+      // 4. Fetch all decisions for history
+      const allRes = await fetch(`${API_BASE}/decisions`).catch(() => null);
+      if (allRes && allRes.ok) {
+        const allData = await allRes.json();
+        if (Array.isArray(allData)) {
+          setHistoryDecisions(allData.filter(d => d.status !== 'proposed'));
+        }
+      }
     } catch (err) {
-      console.error('Error fetching data:', err);
-      setError(err.message || 'Failed to connect to orchestrator API (port 4000)');
+      console.warn('Data fetch warning:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConnectClusterSubmit = async (e) => {
+    e.preventDefault();
+    if (!inputConnString.trim()) {
+      setConnectError('Please enter a valid CockroachDB connection string.');
+      return;
+    }
+
+    setIsConnectingCluster(true);
+    setConnectError(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/cluster/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connectionString: inputConnString.trim(),
+          label: inputClusterLabel.trim() || 'cockroachdb-primary'
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to connect to cluster.');
+      }
+
+      addToast('success', 'Cluster Connected!', data.message || 'Connected to CockroachDB successfully.');
+      setIsConnectModalOpen(false);
+      setInputConnString('');
+      setInputClusterLabel('');
+      await fetchDecisions();
+    } catch (err) {
+      console.error('Cluster connection error:', err);
+      setConnectError(err.message || 'Connection failed.');
+      addToast('error', 'Connection Failed', err.message);
+    } finally {
+      setIsConnectingCluster(false);
     }
   };
 
@@ -299,7 +355,26 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Cluster Status Indicator Pill */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: clusterStatus.connected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 122, 0, 0.12)',
+            border: `1px solid ${clusterStatus.connected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 122, 0, 0.3)'}`,
+            padding: '5px 10px',
+            borderRadius: '6px',
+            fontSize: '0.76rem',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 700,
+            color: clusterStatus.connected ? 'var(--logdy-green)' : 'var(--logdy-orange)',
+            whiteSpace: 'nowrap'
+          }}>
+            <span style={{ fontSize: '0.7rem' }}>{clusterStatus.connected ? '●' : '○'}</span>
+            <span>{clusterStatus.connected ? `Connected (${clusterStatus.clusterName || 'CockroachDB'})` : 'Not Connected'}</span>
+          </div>
+
           <button 
             onClick={fetchDecisions}
             className="logdy-btn-alt"
@@ -323,6 +398,37 @@ export default function DashboardPage() {
           </button>
         </div>
       </header>
+
+      {/* Onboarding Banner when Cluster is Not Connected */}
+      {!clusterStatus.connected && (
+        <div className="feature-box" style={{ 
+          marginBottom: '28px', 
+          borderLeft: '4px solid var(--logdy-orange)',
+          background: 'rgba(255, 122, 0, 0.04)',
+          padding: '20px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--logdy-orange)', fontWeight: 800, fontFamily: 'var(--font-mono)', fontSize: '0.95rem', marginBottom: '4px' }}>
+              <Database size={16} /> NO COCKROACHDB CLUSTER CONNECTED
+            </div>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--logdy-text-muted)', lineHeight: '1.5' }}>
+              Connect your CockroachDB cluster URL to start live telemetry, Bedrock AI anomaly reasoning, and vector decision search.
+            </p>
+          </div>
+          <button 
+            onClick={() => setIsConnectModalOpen(true)}
+            className="logdy-btn-brand"
+            style={{ padding: '8px 20px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+          >
+            Connect Cluster Now
+          </button>
+        </div>
+      )}
 
       {/* Live Cluster Health Metrics Bar */}
       <ClusterMetrics metrics={clusterMetrics} pendingCount={proposedDecisions.length} />
@@ -412,7 +518,7 @@ export default function DashboardPage() {
             marginBottom: '18px' 
           }}>
             {/* Sub-tabs */}
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button 
                 onClick={() => setSubTab('proposed')}
                 style={{
@@ -533,9 +639,13 @@ export default function DashboardPage() {
             filteredProposed.length === 0 ? (
               <div className="feature-box" style={{ padding: '40px', textAlign: 'center', color: 'var(--logdy-text-muted)' }}>
                 <Clock size={36} color="var(--logdy-orange)" style={{ marginBottom: '12px' }} />
-                <h3 style={{ color: 'var(--logdy-text-heading)' }}>No Pending Approval Requests</h3>
+                <h3 style={{ color: 'var(--logdy-text-heading)' }}>
+                  {clusterStatus.connected ? 'No Pending Approval Requests' : 'Connect Cluster to Receive AI Proposals'}
+                </h3>
                 <p style={{ fontSize: '0.85rem', marginTop: '6px' }}>
-                  {proposedDecisions.length > 0 ? 'No decisions match the current filter criteria.' : 'All proposed AI agent decisions have been processed.'}
+                  {clusterStatus.connected 
+                    ? (proposedDecisions.length > 0 ? 'No decisions match the current filter criteria.' : 'All proposed AI agent decisions have been processed.')
+                    : 'Connect your CockroachDB cluster above to initialize live incident monitoring.'}
                 </p>
               </div>
             ) : (
@@ -589,21 +699,23 @@ export default function DashboardPage() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
+          background: 'rgba(0, 0, 0, 0.75)',
           backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '20px'
+          padding: '16px'
         }}>
           <div className="feature-box" style={{
-            maxWidth: '520px',
+            maxWidth: 'min(92vw, 560px)',
             width: '100%',
             background: 'var(--logdy-card-bg)',
             border: '1px solid var(--logdy-orange)',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
-            position: 'relative'
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)',
+            position: 'relative',
+            maxHeight: '90vh',
+            overflowY: 'auto'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -619,12 +731,85 @@ export default function DashboardPage() {
             </div>
 
             <p style={{ color: 'var(--logdy-text-muted)', fontSize: '0.88rem', marginBottom: '16px', lineHeight: '1.5' }}>
-              Connect your CockroachDB Serverless or Dedicated cluster to enable live telemetry, Bedrock AI synthesis, and vector memory.
+              Connect your CockroachDB Serverless or Dedicated cluster directly via URL to enable live telemetry, Bedrock AI synthesis, and vector memory.
             </p>
 
-            <div style={{ marginBottom: '16px' }}>
+            {/* Form: Direct Web Connection */}
+            <form onSubmit={handleConnectClusterSubmit} style={{ marginBottom: '20px' }}>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--logdy-text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)', marginBottom: '6px' }}>
+                  CockroachDB Connection String (postgresql://...)
+                </label>
+                <textarea
+                  rows={3}
+                  value={inputConnString}
+                  onChange={(e) => setInputConnString(e.target.value)}
+                  placeholder="postgresql://user:password@host:26257/infra_historian?sslmode=verify-full"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    background: 'var(--logdy-code-bg)',
+                    border: '1px solid var(--logdy-card-border)',
+                    borderRadius: '6px',
+                    color: 'var(--logdy-text-main)',
+                    fontSize: '0.82rem',
+                    fontFamily: 'var(--font-mono)',
+                    outline: 'none',
+                    resize: 'none'
+                  }}
+                  required
+                />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--logdy-text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)', marginBottom: '6px' }}>
+                  Cluster Label (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={inputClusterLabel}
+                  onChange={(e) => setInputClusterLabel(e.target.value)}
+                  placeholder="e.g. production-cluster"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: 'var(--logdy-code-bg)',
+                    border: '1px solid var(--logdy-card-border)',
+                    borderRadius: '6px',
+                    color: 'var(--logdy-text-main)',
+                    fontSize: '0.85rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {connectError && (
+                <div style={{ color: 'var(--logdy-coral)', fontSize: '0.8rem', marginBottom: '12px', wordBreak: 'break-word' }}>
+                  ⚠ {connectError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="logdy-btn-brand"
+                disabled={isConnectingCluster || !inputConnString.trim()}
+                style={{ width: '100%', padding: '10px', fontSize: '0.88rem', justifyContent: 'center' }}
+              >
+                {isConnectingCluster ? (
+                  <>
+                    <RefreshCw size={15} className="animate-spin" /> Verifying Connection & Initializing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} /> Test & Connect Cluster
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div style={{ borderTop: '1px solid var(--logdy-card-border)', paddingTop: '16px', marginBottom: '14px' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--logdy-text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)', marginBottom: '6px' }}>
-                Option 1: Quick CLI Onboarding Wizard
+                Alternative: Connect via Terminal CLI Wizard
               </div>
               <div className="logdy-terminal-box" style={{ margin: 0, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <code style={{ color: 'var(--logdy-cyan)', fontSize: '0.85rem' }}>cortexops init</code>
@@ -634,22 +819,13 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div style={{ marginBottom: '20px', fontSize: '0.82rem', color: 'var(--logdy-text-muted)', lineHeight: '1.6' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--logdy-green)', fontWeight: 600, marginBottom: '4px' }}>
-                <CheckCircle2 size={14} /> Active Cluster Endpoint:
-              </div>
-              <div className="mono" style={{ background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '4px', wordBreak: 'break-all', fontSize: '0.78rem' }}>
-                http://localhost:4000 (node-orchestrator)
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
               <button 
                 onClick={() => setIsConnectModalOpen(false)}
-                className="logdy-btn-brand"
-                style={{ padding: '8px 18px', fontSize: '0.85rem' }}
+                className="logdy-btn-alt"
+                style={{ padding: '6px 16px', fontSize: '0.82rem' }}
               >
-                Done
+                Close
               </button>
             </div>
           </div>

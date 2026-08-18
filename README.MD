@@ -81,50 +81,71 @@ This starts all 3 services — go-agent (:5005), node-orchestrator (:4000), fron
 
 CortexOps includes a production-grade Command-Line Interface (`cortexops`) built with **Cobra**, **Viper**, **Lipgloss**, **Huh**, and **Spinner**.
 
-### Building the CLI
+### Building & Installing the CLI
 ```bash
 cd go-agent
 make build-cli
-# Or directly: go build -o cortexops ./cmd/cortexops/
+make install # Installs globally to ~/.local/bin/cortexops
 ```
 
-### CLI Subcommands & Examples
+### Complete CLI Command Directory
 
 ```bash
-# 1. Inspect live cluster health (styled Lipgloss TUI box)
-./cortexops cluster get-health
-./cortexops status
-./cortexops status --output json
+# ----------------------------------------------------------------------------
+# 1. ONBOARDING & SETUP WIZARD
+# ----------------------------------------------------------------------------
+cortexops init               # 2-step setup: Connection URL & Cluster Name
+cortexops init --advanced    # 4-step setup: Includes custom API URL & AI assist toggle
+cortexops onboard            # Alias for init
 
-# 2. View pending approval queue (styled Lipgloss TUI table)
-./cortexops decision list
-./cortexops queue --limit 3
-./cortexops decision list --output json
+# ----------------------------------------------------------------------------
+# 2. CLUSTER MANAGEMENT
+# ----------------------------------------------------------------------------
+cortexops cluster get-health # Inspect live cluster CPU, queries, contention & safety gate
+cortexops status             # Alias for cluster get-health
+cortexops status --watch     # Live 2-second auto-refreshing TUI dashboard
+cortexops status -o json     # Automation-friendly JSON output
 
-# 3. Approve & execute a proposed decision (interactive prompt if ID omitted)
-./cortexops decision approve a625baf7-1361-47a1-b468-75c0b9e18c10
-./cortexops approve    # Opens interactive Huh selection menu!
+cortexops cluster list       # List all configured CockroachDB clusters with active indicator
+cortexops cluster ls         # Alias for cluster list
+cortexops cluster add        # Interactively connect and validate a new cluster
+cortexops cluster switch <name>  # Switch active CockroachDB cluster profile
+cortexops cluster remove <name>  # Disconnect and delete a cluster configuration
+cortexops disconnect         # Interactive cluster disconnect menu
 
-# 4. Reject a proposed decision (interactive prompt if ID omitted)
-./cortexops decision reject 372463d1-462f-46a6-96b4-8d91e2b0df19
-./cortexops reject     # Opens interactive Huh selection menu!
+# ----------------------------------------------------------------------------
+# 3. DECISION APPROVALS & REMEDIATION QUEUE
+# ----------------------------------------------------------------------------
+cortexops decision list      # Interactive Bubbletea TUI list of proposed AI remediations
+cortexops queue              # Alias for decision list (use [a] approve, [r] reject)
+cortexops queue --limit 3    # Limit displayed items
 
-# 5. Natural language vector search over operational memory
-./cortexops memory search "why did you take a backup?"
-./cortexops ask        # Opens interactive Huh input prompt!
+cortexops decision approve <id>  # Authorize decision ID and execute whitelisted action
+cortexops approve <id>           # Alias for decision approve (interactive if ID omitted)
 
-# 6. Persistent configuration management (~/.cortexops/config.yaml via Viper)
-./cortexops config view
-./cortexops config set api_url http://localhost:4000
-./cortexops config set default_limit 10
+cortexops decision reject <id>   # Reject decision without executing command
+cortexops reject <id>            # Alias for decision reject (interactive if ID omitted)
 
-# 7. Shell autocompletion script generator
-./cortexops completion zsh
-./cortexops completion bash
-./cortexops completion fish
+# ----------------------------------------------------------------------------
+# 4. OPERATIONAL VECTOR MEMORY SEARCH
+# ----------------------------------------------------------------------------
+cortexops memory search "why did you scale up?"  # Semantic cosine similarity search
+cortexops ask "why did you take a backup?"       # Alias for memory search
+cortexops ask                                    # Opens interactive search prompt
 
-# 8. Version information
-./cortexops version
+# ----------------------------------------------------------------------------
+# 5. CONFIGURATION MANAGEMENT (~/.cortexops/config.yaml, mode 0600)
+# ----------------------------------------------------------------------------
+cortexops config view        # Display effective configuration and active path
+cortexops config get api_url # Get a specific config value
+cortexops config set default_limit 10 # Persist a config setting
+
+# ----------------------------------------------------------------------------
+# 6. GLOBAL FLAGS & UTILITIES
+# ----------------------------------------------------------------------------
+cortexops --help             # Command help
+cortexops version            # Version and active connected endpoint
+cortexops completion zsh     # Shell autocompletion generator (zsh/bash/fish)
 ```
 
 ---

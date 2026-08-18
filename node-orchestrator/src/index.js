@@ -2,11 +2,60 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { embed, reason } from "./bedrock.js";
-import { listDecisions, similarDecisions, setDecisionStatus, recordOutcome, getDecisionById, getLatestSnapshot, insertDecision, insertSnapshot } from "./db.js";
+import { 
+  listDecisions, 
+  similarDecisions, 
+  setDecisionStatus, 
+  recordOutcome, 
+  getDecisionById, 
+  getLatestSnapshot, 
+  insertDecision, 
+  insertSnapshot,
+  isDbConnected,
+  getActiveConnectionString,
+  updateConnection
+} from "./db.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// GET /cluster/status
+app.get("/cluster/status", (req, res) => {
+  const connected = isDbConnected();
+  const connStr = getActiveConnectionString();
+  let clusterName = "CockroachDB";
+  if (connStr) {
+    const match = connStr.match(/@([^:/]+)/);
+    if (match && match[1]) clusterName = match[1];
+  }
+  return res.json({
+    connected,
+    clusterName: connected ? clusterName : "Not Connected",
+    message: connected ? "CockroachDB cluster is online and reachable" : "No active CockroachDB cluster connected"
+  });
+});
+
+// POST /cluster/connect -> user connects cluster directly from web dashboard
+app.post("/cluster/connect", async (req, res) => {
+  const { connectionString, label } = req.body || {};
+  if (!connectionString || !connectionString.trim()) {
+    return res.status(400).json({ error: "CockroachDB connection string is required." });
+  }
+
+  try {
+    const cleanStr = connectionString.trim().replace(/^['"]|['"]$/g, '');
+    const result = await updateConnection(cleanStr);
+    return res.json({
+      success: true,
+      cluster: label || "cockroachdb",
+      message: result.message
+    });
+  } catch (err) {
+    console.error("[POST /cluster/connect Error]", err.message);
+    return res.status(400).json({ error: err.message });
+  }
+});
 
 // GET /cluster/health
 app.get("/cluster/health", async (req, res) => {
@@ -23,8 +72,14 @@ app.get("/cluster/health", async (req, res) => {
       captured_at: new Date().toISOString(),
     });
   } catch (err) {
-    console.error(`[GET /cluster/health Error]`, err.message);
-    res.status(500).json({ error: err.message });
+    console.warn(`[GET /cluster/health Warning]`, err.message);
+    return res.json({
+      cpu_percent: 0,
+      active_queries: 0,
+      contention_events: 0,
+      replication_status: "disconnected",
+      captured_at: new Date().toISOString(),
+    });
   }
 });
 
