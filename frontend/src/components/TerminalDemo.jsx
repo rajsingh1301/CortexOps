@@ -194,9 +194,9 @@ export default function TerminalDemo() {
         </div>
 
         {/* Terminal Screen Body */}
-        <div className="terminal-body">
+        <div className="terminal-body" style={{ overflowX: 'auto' }}>
           {/* Prompt line */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
             <span style={{ color: '#00e676', fontWeight: 'bold' }}>➜</span>
             <span style={{ color: '#00f0ff', fontWeight: 'bold' }}>cortexops</span>
             <span style={{ color: '#64748b' }}>git:(main)</span>
@@ -206,7 +206,7 @@ export default function TerminalDemo() {
 
           {/* Rendered Output */}
           {showOutput && (
-            <div>
+            <div style={{ overflowX: 'auto', whiteSpace: 'pre', fontFamily: 'var(--font-mono)' }}>
               {activeDemo.render()}
               <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b' }}>
                 <span style={{ color: '#00e676' }}>➜</span>

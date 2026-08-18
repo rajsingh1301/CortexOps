@@ -56,43 +56,47 @@ export default function Navbar() {
       <div style={{
         maxWidth: '1000px',
         margin: '0 auto',
-        padding: '14px 24px',
+        padding: '12px clamp(12px, 3vw, 24px)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between'
+        justifyContent: 'space-between',
+        gap: '10px'
       }}>
         {/* Logo */}
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
-          <span style={{ fontSize: '1.2rem' }}>🪲</span>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', flexShrink: 0 }}>
+          <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>🪲</span>
           <span style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: '1.15rem',
+            fontSize: 'clamp(1rem, 2.5vw, 1.15rem)',
             fontWeight: '700',
-            color: 'var(--logdy-text-heading)'
+            color: 'var(--logdy-text-heading)',
+            whiteSpace: 'nowrap'
           }}>
             CortexOps
           </span>
           <span style={{
-            fontSize: '0.7rem',
+            fontSize: '0.68rem',
             fontFamily: 'var(--font-mono)',
             color: 'var(--logdy-orange)',
             background: 'rgba(255, 122, 0, 0.12)',
-            padding: '1px 6px',
+            padding: '1px 5px',
             borderRadius: '4px',
-            border: '1px solid rgba(255, 122, 0, 0.3)'
+            border: '1px solid rgba(255, 122, 0, 0.3)',
+            whiteSpace: 'nowrap'
           }}>v1.2.0</span>
         </Link>
 
         {/* Navigation Links + Theme Toggle + GitHub */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 18px)', flexShrink: 0 }}>
           <Link
             to="/"
             style={{
-              fontSize: '0.9rem',
-              fontWeight: isActive('/') ? '600' : '400',
+              fontSize: '0.86rem',
+              fontWeight: isActive('/') ? '700' : '500',
               color: isActive('/') ? 'var(--logdy-orange)' : 'var(--logdy-text-muted)',
               textDecoration: 'none',
-              transition: 'color 0.15s ease'
+              transition: 'color 0.15s ease',
+              whiteSpace: 'nowrap'
             }}
           >
             Home
@@ -101,11 +105,12 @@ export default function Navbar() {
           <Link
             to="/docs"
             style={{
-              fontSize: '0.9rem',
-              fontWeight: isActive('/docs') ? '600' : '400',
+              fontSize: '0.86rem',
+              fontWeight: isActive('/docs') ? '700' : '500',
               color: isActive('/docs') ? 'var(--logdy-orange)' : 'var(--logdy-text-muted)',
               textDecoration: 'none',
-              transition: 'color 0.15s ease'
+              transition: 'color 0.15s ease',
+              whiteSpace: 'nowrap'
             }}
           >
             Docs
@@ -114,11 +119,12 @@ export default function Navbar() {
           <Link
             to="/dashboard"
             style={{
-              fontSize: '0.9rem',
-              fontWeight: isActive('/dashboard') ? '600' : '400',
+              fontSize: '0.86rem',
+              fontWeight: isActive('/dashboard') ? '700' : '500',
               color: isActive('/dashboard') ? 'var(--logdy-orange)' : 'var(--logdy-text-muted)',
               textDecoration: 'none',
-              transition: 'color 0.15s ease'
+              transition: 'color 0.15s ease',
+              whiteSpace: 'nowrap'
             }}
           >
             Dashboard
@@ -130,8 +136,9 @@ export default function Navbar() {
             className="theme-toggle-btn"
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             aria-label="Toggle theme"
+            style={{ padding: '5px 8px', flexShrink: 0 }}
           >
-            {theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+            {theme === 'dark' ? <SunIcon size={15} /> : <MoonIcon size={15} />}
           </button>
 
           {/* GitHub Link */}
@@ -144,11 +151,12 @@ export default function Navbar() {
               display: 'flex',
               alignItems: 'center',
               textDecoration: 'none',
-              transition: 'color 0.15s ease'
+              transition: 'color 0.15s ease',
+              flexShrink: 0
             }}
             title="GitHub Repository"
           >
-            <GithubIcon size={18} />
+            <GithubIcon size={17} />
           </a>
         </div>
       </div>

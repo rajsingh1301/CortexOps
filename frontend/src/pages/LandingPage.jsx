@@ -18,22 +18,23 @@ export default function LandingPage() {
       {/* 1. HERO TITLE & TAGLINE (LOGDY STYLE) */}
       {/* ========================================================================= */}
       <h1 style={{
-        fontSize: 'clamp(2rem, 4.5vw, 3rem)',
+        fontSize: 'clamp(1.8rem, 4.5vw, 3rem)',
         fontWeight: '800',
         lineHeight: '1.25',
         marginBottom: '16px',
-        color: 'var(--logdy-text-heading)'
+        color: 'var(--logdy-text-heading)',
+        textWrap: 'balance'
       }}>
-        <span className="orange">Supercharge</span> CockroachDB operations with <br />
-        autonomous AI runbooks & safety gating
+        <span className="orange">Supercharge</span> CockroachDB operations with autonomous AI runbooks & safety gating
       </h1>
 
       <p style={{
-        fontSize: '1.2rem',
+        fontSize: 'clamp(0.95rem, 2.5vw, 1.2rem)',
         color: 'var(--logdy-text-muted)',
         maxWidth: '680px',
         margin: '0 auto 36px',
-        lineHeight: '1.5'
+        lineHeight: '1.6',
+        textWrap: 'balance'
       }}>
         <span className="orange">Save 90% of SRE toil</span> diagnosing query contention, automating cluster scaling, and remembering past decisions.
       </p>
@@ -44,10 +45,10 @@ export default function LandingPage() {
       <div style={{ maxWidth: '640px', margin: '0 auto 40px', textAlign: 'left' }}>
         <div className="logdy-terminal-box">
           <div className="logdy-terminal-header">
-            <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               bash — 1-command global install
             </span>
-            <button onClick={handleCopyInstall} className="copy-pill-btn">
+            <button onClick={handleCopyInstall} className="copy-pill-btn" style={{ flexShrink: 0 }}>
               {copiedInstall ? '✓ Copied' : 'Copy'}
             </button>
           </div>
@@ -64,18 +65,18 @@ export default function LandingPage() {
             </div>
 
             {/* Simulated Banner Output */}
-            <div style={{ color: '#00bcd4', fontSize: '0.74rem', marginTop: '10px', lineHeight: '1.2', opacity: 0.95 }}>
-              <pre style={{ margin: 0, fontFamily: 'var(--font-mono)' }}>{`   ___               _                  ___             
+            <div style={{ color: '#00bcd4', fontSize: 'clamp(0.62rem, 1.8vw, 0.74rem)', marginTop: '10px', lineHeight: '1.2', opacity: 0.95, overflowX: 'auto' }}>
+              <pre style={{ margin: 0, fontFamily: 'var(--font-mono)', whiteSpace: 'pre' }}>{`   ___               _                  ___             
   / __|  ___   _ _  | |_   ___  __ __  / _ \\   _ __   ___
  | (__  / _ \\ | '_| |  _| / -_) \\ \\ / | (_) | | '_ \\ (_-<
   \\___| \\___/ |_|    \\__| \\___| /_\\_\\  \\___/  | .__/ /__/
                                               |_|        `}</pre>
             </div>
 
-            <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#10b981' }}>
+            <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#10b981', overflowWrap: 'break-word' }}>
               ● Connected to cluster (http://localhost:4000) · v1.2.0
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8', overflowWrap: 'break-word' }}>
               Autonomous, AI-assisted operations & self-healing agent for CockroachDB clusters.
             </div>
           </div>
@@ -93,25 +94,26 @@ export default function LandingPage() {
       {/* 4. VALUE PROP COMPARISON (LOGDY "IT'S LIKE X" STATEMENT) */}
       {/* ========================================================================= */}
       <p style={{
-        fontSize: '1.25rem',
+        fontSize: 'clamp(1rem, 2.5vw, 1.25rem)',
         fontWeight: '500',
         color: 'var(--logdy-text-heading)',
         maxWidth: '780px',
         margin: '0 auto 36px',
-        lineHeight: '1.6'
+        lineHeight: '1.6',
+        textWrap: 'balance'
       }}>
         It's like <span className="orange">an SRE</span>, <span className="orange">ccloud</span>, <span className="orange">Agent Skills</span>, and <span className="orange">vector memory</span> merged together and available in a clean CLI and UI.
       </p>
 
       {/* Action CTA Buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', marginBottom: '72px', flexWrap: 'wrap' }}>
-        <Link to="/docs" className="logdy-btn-brand">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '72px', flexWrap: 'wrap' }}>
+        <Link to="/docs" className="logdy-btn-brand" style={{ whiteSpace: 'nowrap' }}>
           Quick start
         </Link>
-        <Link to="/docs" className="logdy-btn-alt">
+        <Link to="/docs" className="logdy-btn-alt" style={{ whiteSpace: 'nowrap' }}>
           Read docs
         </Link>
-        <Link to="/dashboard" className="logdy-btn-alt">
+        <Link to="/dashboard" className="logdy-btn-alt" style={{ whiteSpace: 'nowrap' }}>
           Live Dashboard
         </Link>
       </div>
@@ -132,7 +134,7 @@ export default function LandingPage() {
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
           gap: '16px'
         }}>
           {/* Feature 1 */}

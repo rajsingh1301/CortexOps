@@ -147,14 +147,14 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
             <span 
               className={`metric-val ${flashMetric === 'cpu' ? 'metric-flash' : ''}`}
               style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--logdy-text-heading)', fontFamily: 'var(--font-mono)' }}
             >
               {typeof currentCpu === 'number' ? currentCpu.toFixed(1) : currentCpu}%
             </span>
-            <span style={{ fontSize: '0.74rem', color: cpuStatus.color, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: '0.74rem', color: cpuStatus.color, fontWeight: 700, fontFamily: 'var(--font-mono)', lineHeight: 1.3 }}>
               {cpuStatus.text}
             </span>
           </div>
@@ -196,14 +196,14 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
             <span 
               className={`metric-val ${flashMetric === 'queries' ? 'metric-flash' : ''}`}
               style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--logdy-text-heading)', fontFamily: 'var(--font-mono)' }}
             >
               {currentQueries}
             </span>
-            <span style={{ fontSize: '0.74rem', color: currentContention > 0 ? 'var(--logdy-coral)' : 'var(--logdy-text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: '0.74rem', color: currentContention > 0 ? 'var(--logdy-coral)' : 'var(--logdy-text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)', lineHeight: 1.3 }}>
               {currentContention} lock{currentContention !== 1 ? 's' : ''}
             </span>
           </div>
@@ -245,11 +245,11 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--logdy-text-heading)', fontFamily: 'var(--font-mono)' }}>
               Healthy
             </span>
-            <span style={{ fontSize: '0.74rem', color: 'var(--logdy-green)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--logdy-green)', fontWeight: 700, fontFamily: 'var(--font-mono)', lineHeight: 1.3 }}>
               100% Range Coverage
             </span>
           </div>
@@ -291,11 +291,11 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--logdy-text-heading)', fontFamily: 'var(--font-mono)' }}>
               Enforced
             </span>
-            <span style={{ fontSize: '0.74rem', color: 'var(--logdy-orange)', fontWeight: 700, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--logdy-orange)', fontWeight: 700, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '3px', lineHeight: 1.3 }}>
               <Zap size={11} /> {pendingCount} Pending
             </span>
           </div>
@@ -333,10 +333,10 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000,
-          padding: '20px'
+          padding: '16px'
         }}>
           <div className="feature-box" style={{
-            maxWidth: '720px',
+            maxWidth: 'min(92vw, 720px)',
             width: '100%',
             background: 'var(--logdy-card-bg)',
             border: '1px solid var(--logdy-orange)',
@@ -346,14 +346,14 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
             overflowY: 'auto'
           }}>
             {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {expandedMetric === 'cpu' && <Cpu size={22} color="var(--logdy-orange)" />}
                 {expandedMetric === 'queries' && <Activity size={22} color="var(--logdy-cyan)" />}
                 {expandedMetric === 'replication' && <Database size={22} color="var(--logdy-green)" />}
                 {expandedMetric === 'safety' && <ShieldCheck size={22} color="var(--logdy-green)" />}
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', overflowWrap: 'break-word' }}>
                     {expandedMetric === 'cpu' && 'CockroachDB Cluster CPU Telemetry'}
                     {expandedMetric === 'queries' && 'Active Statements & Transaction Contention'}
                     {expandedMetric === 'replication' && 'Raft Quorum & Range Distribution'}
@@ -412,10 +412,10 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
             </div>
 
             {/* Summary Statistics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginTop: '16px' }}>
               <div style={{ background: 'var(--logdy-code-bg)', padding: '10px 14px', borderRadius: '6px', fontFamily: 'var(--font-mono)' }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--logdy-text-dim)' }}>CURRENT</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--logdy-text-heading)' }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--logdy-text-heading)', overflowWrap: 'break-word' }}>
                   {expandedMetric === 'cpu' && `${currentCpu.toFixed(1)}%`}
                   {expandedMetric === 'queries' && `${currentQueries} Active`}
                   {expandedMetric === 'replication' && '100% Quorum'}
@@ -425,7 +425,7 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
 
               <div style={{ background: 'var(--logdy-code-bg)', padding: '10px 14px', borderRadius: '6px', fontFamily: 'var(--font-mono)' }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--logdy-text-dim)' }}>PEAK (1 HR)</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--logdy-orange)' }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--logdy-orange)', overflowWrap: 'break-word' }}>
                   {expandedMetric === 'cpu' && `${Math.max(...history.map(h => h.cpu)).toFixed(1)}%`}
                   {expandedMetric === 'queries' && `${Math.max(...history.map(h => h.queries))} Active`}
                   {expandedMetric === 'replication' && '100%'}
@@ -435,7 +435,7 @@ export default function ClusterMetrics({ metrics, pendingCount = 0 }) {
 
               <div style={{ background: 'var(--logdy-code-bg)', padding: '10px 14px', borderRadius: '6px', fontFamily: 'var(--font-mono)' }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--logdy-text-dim)' }}>AI AGENT SKILL</div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--logdy-cyan)' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--logdy-cyan)', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                   {expandedMetric === 'cpu' && 'performance-and-scaling'}
                   {expandedMetric === 'queries' && 'query-and-schema-design'}
                   {expandedMetric === 'replication' && 'operations-and-lifecycle'}

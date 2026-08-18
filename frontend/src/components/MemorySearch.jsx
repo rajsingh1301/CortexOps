@@ -73,8 +73,8 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
 
         {/* Search Input Form */}
         <form onSubmit={handleSubmit} style={{ position: 'relative', marginBottom: '14px' }}>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Search size={18} color="var(--logdy-cyan)" style={{ position: 'absolute', left: '16px', pointerEvents: 'none' }} />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minWidth: 0 }}>
+            <Search size={18} color="var(--logdy-cyan)" style={{ position: 'absolute', left: '14px', pointerEvents: 'none', flexShrink: 0 }} />
             <input 
               type="text" 
               value={query}
@@ -82,15 +82,16 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
               placeholder="Ask why the agent made a decision (e.g. why did you scale up?)..."
               style={{
                 width: '100%',
-                padding: '12px 110px 12px 46px',
+                padding: '12px 100px 12px 42px',
                 background: 'var(--logdy-code-bg)',
                 border: '1px solid var(--logdy-card-border)',
                 borderRadius: '8px',
                 color: 'var(--logdy-text-main)',
-                fontSize: '0.9rem',
+                fontSize: '0.88rem',
                 fontFamily: 'var(--font-body)',
                 outline: 'none',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                minWidth: 0
               }}
             />
             {query && (
@@ -99,7 +100,7 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
                 onClick={handleClear}
                 style={{
                   position: 'absolute',
-                  right: '90px',
+                  right: '84px',
                   background: 'transparent',
                   border: 'none',
                   color: 'var(--logdy-text-dim)',
@@ -107,7 +108,7 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
                   padding: '4px'
                 }}
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             )}
             <button 
@@ -116,20 +117,21 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
               disabled={isSearching || !query.trim()}
               style={{
                 position: 'absolute',
-                right: '6px',
-                padding: '6px 14px',
-                fontSize: '0.8rem',
-                gap: '6px'
+                right: '5px',
+                padding: '6px 12px',
+                fontSize: '0.78rem',
+                gap: '5px',
+                whiteSpace: 'nowrap'
               }}
             >
-              {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Search
+              {isSearching ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} Search
             </button>
           </div>
         </form>
 
         {/* Quick Suggestion Chips */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--logdy-text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--logdy-text-dim)', fontWeight: 600, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
             Try asking:
           </span>
           {SUGGESTIONS.map((chip, idx) => (
@@ -140,7 +142,9 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
               style={{
                 fontSize: '0.75rem',
                 padding: '4px 10px',
-                borderRadius: '4px'
+                borderRadius: '4px',
+                whiteSpace: 'normal',
+                textAlign: 'left'
               }}
             >
               "{chip}"
@@ -161,9 +165,10 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
           fontSize: '0.85rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: '8px',
+          overflowWrap: 'break-word'
         }}>
-          <AlertCircle size={16} /> {error}
+          <AlertCircle size={16} style={{ flexShrink: 0 }} /> {error}
         </div>
       )}
 
@@ -198,22 +203,22 @@ export default function MemorySearch({ onApprove, onReject, actionLoadingId }) {
         </div>
       ) : (
         results.map((decision, idx) => (
-          <div key={decision.id} style={{ position: 'relative' }}>
+          <div key={decision.id} style={{ marginBottom: '18px' }}>
             <div style={{
-              position: 'absolute',
-              top: '16px',
-              right: '16px',
-              zIndex: 10,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginBottom: '8px',
               background: 'rgba(0, 188, 212, 0.12)',
               border: '1px solid rgba(0, 188, 212, 0.3)',
               color: 'var(--logdy-cyan)',
-              padding: '2px 8px',
+              padding: '3px 10px',
               borderRadius: '4px',
-              fontSize: '0.72rem',
+              fontSize: '0.74rem',
               fontFamily: 'var(--font-mono)',
               fontWeight: 700
             }}>
-              #{idx + 1} Vector Match
+              <Sparkles size={12} /> #{idx + 1} Vector Semantic Match
             </div>
             <DecisionCard 
               decision={decision} 

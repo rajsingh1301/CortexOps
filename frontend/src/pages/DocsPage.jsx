@@ -66,10 +66,10 @@ export default function DocsPage() {
       </div>
 
       {/* Grid Layout (Sidebar + Content) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '36px' }}>
+      <div className="docs-layout-grid" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '36px' }}>
         
         {/* Sidebar */}
-        <aside style={{
+        <aside className="docs-sidebar-nav" style={{
           position: 'sticky',
           top: '80px',
           height: 'fit-content',
@@ -119,7 +119,7 @@ export default function DocsPage() {
         </aside>
 
         {/* Content Body */}
-        <main style={{ minWidth: 0 }}>
+        <main style={{ minWidth: 0, overflowX: 'hidden' }}>
           
           {/* 1. INSTALLATION */}
           <section id="installation" style={{ marginBottom: '50px', scrollMarginTop: '90px' }}>

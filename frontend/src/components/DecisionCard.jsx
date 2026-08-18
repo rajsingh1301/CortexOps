@@ -77,8 +77,8 @@ export default function DecisionCard({
       }}
     >
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px 14px', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', minWidth: 0 }}>
           {getStatusBadge()}
           <span style={{ 
             fontSize: '0.98rem', 
@@ -86,16 +86,17 @@ export default function DecisionCard({
             textTransform: 'uppercase', 
             letterSpacing: '0.04em',
             fontFamily: 'var(--font-mono)',
-            color: 'var(--logdy-text-heading)'
+            color: 'var(--logdy-text-heading)',
+            whiteSpace: 'nowrap'
           }}>
             {action_type?.replace('_', ' ')}
           </span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--logdy-text-dim)', fontFamily: 'var(--font-mono)' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--logdy-text-dim)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
             ({id ? id.slice(0, 8) : 'id'})
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.78rem', color: 'var(--logdy-text-muted)', fontFamily: 'var(--font-mono)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px 14px', fontSize: '0.78rem', color: 'var(--logdy-text-muted)', fontFamily: 'var(--font-mono)', flexWrap: 'wrap' }}>
           {confidence && (
             <span style={{ 
               background: 'rgba(0, 188, 212, 0.12)', 
@@ -103,15 +104,16 @@ export default function DecisionCard({
               border: '1px solid rgba(0, 188, 212, 0.3)',
               padding: '2px 8px', 
               borderRadius: '4px',
-              fontWeight: 700 
+              fontWeight: 700,
+              whiteSpace: 'nowrap'
             }}>
               {confidencePct}% Confidence
             </span>
           )}
           {trigger_source && (
-            <span>Trigger: <strong style={{ color: 'var(--logdy-text-heading)' }}>{trigger_source}</strong></span>
+            <span style={{ whiteSpace: 'nowrap' }}>Trigger: <strong style={{ color: 'var(--logdy-text-heading)' }}>{trigger_source}</strong></span>
           )}
-          <span>{created_at ? new Date(created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+          <span style={{ whiteSpace: 'nowrap' }}>{created_at ? new Date(created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
         </div>
       </div>
 
@@ -123,7 +125,7 @@ export default function DecisionCard({
         padding: '12px 16px',
         marginBottom: '14px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: 'var(--logdy-cyan)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
             <BrainCircuit size={14} /> AI AGENT REASONING LOG
           </div>
@@ -159,6 +161,8 @@ export default function DecisionCard({
           color: '#e2e8f0',
           margin: 0,
           whiteSpace: 'pre-wrap',
+          overflowWrap: 'break-word',
+          wordBreak: 'break-word',
           display: isLongReasoning && !isExpanded ? '-webkit-box' : 'block',
           WebkitLineClamp: isLongReasoning && !isExpanded ? 2 : 'unset',
           WebkitBoxOrient: 'vertical',
@@ -199,9 +203,9 @@ export default function DecisionCard({
           <div style={{ fontSize: '0.74rem', color: 'var(--logdy-text-dim)', marginBottom: '4px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
             Proposed Gated CLI Action:
           </div>
-          <div className="logdy-terminal-box" style={{ margin: 0, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Terminal size={14} color="var(--logdy-orange)" />
-            <code style={{ fontSize: '0.8rem', color: 'var(--logdy-cyan)' }}>{ccloud_command}</code>
+          <div className="logdy-terminal-box" style={{ margin: 0, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, overflowX: 'auto' }}>
+            <Terminal size={14} color="var(--logdy-orange)" style={{ flexShrink: 0 }} />
+            <code style={{ fontSize: '0.8rem', color: 'var(--logdy-cyan)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>{ccloud_command}</code>
           </div>
         </div>
       )}

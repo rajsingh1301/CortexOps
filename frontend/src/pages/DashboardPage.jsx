@@ -333,7 +333,8 @@ export default function DashboardPage() {
         gap: '10px', 
         marginBottom: '24px',
         borderBottom: '1px solid var(--logdy-border)',
-        paddingBottom: '12px'
+        paddingBottom: '12px',
+        flexWrap: 'wrap'
       }}>
         <button 
           onClick={() => setActiveTab('feed')}
@@ -341,19 +342,20 @@ export default function DashboardPage() {
             background: activeTab === 'feed' ? 'rgba(255, 122, 0, 0.12)' : 'transparent',
             color: activeTab === 'feed' ? 'var(--logdy-orange)' : 'var(--logdy-text-muted)',
             border: activeTab === 'feed' ? '1px solid rgba(255, 122, 0, 0.4)' : '1px solid transparent',
-            padding: '8px 18px',
+            padding: '8px 16px',
             borderRadius: '6px',
             fontWeight: 700,
             fontFamily: 'var(--font-mono)',
             cursor: 'pointer',
-            fontSize: '0.85rem',
+            fontSize: '0.84rem',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            transition: 'all 0.15s ease'
+            transition: 'all 0.15s ease',
+            whiteSpace: 'nowrap'
           }}
         >
-          <Zap size={15} /> Decision Feed & Approvals ({proposedDecisions.length})
+          <Zap size={15} /> Decision Feed ({proposedDecisions.length})
         </button>
 
         <button 
@@ -362,16 +364,17 @@ export default function DashboardPage() {
             background: activeTab === 'search' ? 'rgba(0, 188, 212, 0.12)' : 'transparent',
             color: activeTab === 'search' ? 'var(--logdy-cyan)' : 'var(--logdy-text-muted)',
             border: activeTab === 'search' ? '1px solid rgba(0, 188, 212, 0.4)' : '1px solid transparent',
-            padding: '8px 18px',
+            padding: '8px 16px',
             borderRadius: '6px',
             fontWeight: 700,
             fontFamily: 'var(--font-mono)',
             cursor: 'pointer',
-            fontSize: '0.85rem',
+            fontSize: '0.84rem',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            transition: 'all 0.15s ease'
+            transition: 'all 0.15s ease',
+            whiteSpace: 'nowrap'
           }}
         >
           <Search size={15} /> Vector Memory Search
