@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import CortexOpsLogo from './CortexOpsLogo';
 
 function GithubIcon({ size = 18 }) {
   return (
@@ -63,8 +64,8 @@ export default function Navbar() {
         gap: '10px'
       }}>
         {/* Logo */}
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', flexShrink: 0 }}>
-          <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>🪲</span>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', flexShrink: 0 }}>
+          <CortexOpsLogo size={22} style={{ marginRight: '1px' }} />
           <span style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 'clamp(1rem, 2.5vw, 1.15rem)',

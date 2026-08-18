@@ -8,8 +8,8 @@ const DEMO_COMMANDS = [
     cmd: 'cortexops status',
     render: () => (
       <div>
-        <div style={{ color: '#ff5252', fontWeight: 'bold', marginBottom: '8px' }}>
-          🪲 CortexOps Cluster Health · http://localhost:4000
+        <div style={{ color: 'var(--logdy-cyan)', fontWeight: 'bold', marginBottom: '8px' }}>
+          &gt; CortexOps Cluster Health · http://localhost:4000
         </div>
         <div style={{ color: '#334155' }}>┌───────────────────┬────────────────────────────────────────┐</div>
         <div>│ <span style={{ color: '#ffffff', fontWeight: 'bold' }}>METRIC</span>            │ <span style={{ color: '#ffffff', fontWeight: 'bold' }}>CURRENT STATUS / VALUE</span>                 │</div>
