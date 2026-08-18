@@ -9,7 +9,7 @@
 import pg from "pg";
 
 const pool = new pg.Pool({
-  connectionString: process.env.COCKROACH_CONN_STRING,
+  connectionString: process.env.COCKROACH_CONN_STRING || process.env.DATABASE_URL,
 });
 
 export async function listDecisions({ status, limit = 50 } = {}) {
