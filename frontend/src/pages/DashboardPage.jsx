@@ -76,6 +76,8 @@ export default function DashboardPage() {
       if (statusRes && statusRes.ok) {
         const statusData = await statusRes.json();
         setClusterStatus(statusData);
+      } else {
+        setClusterStatus({ connected: false, clusterName: 'Not Connected' });
       }
 
       // 2. Fetch cluster health metrics
@@ -83,6 +85,9 @@ export default function DashboardPage() {
       if (healthRes && healthRes.ok) {
         const healthData = await healthRes.json();
         setClusterMetrics(healthData);
+        if (healthData.connected === false) {
+          setClusterStatus({ connected: false, clusterName: 'Not Connected' });
+        }
       }
 
       // 3. Fetch proposed decisions

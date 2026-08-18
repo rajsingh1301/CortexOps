@@ -59,12 +59,24 @@ app.post("/cluster/connect", async (req, res) => {
 
 // GET /cluster/health
 app.get("/cluster/health", async (req, res) => {
+  if (!isDbConnected()) {
+    return res.json({
+      connected: false,
+      cpu_percent: null,
+      active_queries: null,
+      contention_events: 0,
+      replication_status: "disconnected",
+      captured_at: new Date().toISOString(),
+    });
+  }
+
   try {
     const snapshot = await getLatestSnapshot();
     if (snapshot) {
-      return res.json(snapshot);
+      return res.json({ ...snapshot, connected: true });
     }
     return res.json({
+      connected: true,
       cpu_percent: 22.5,
       active_queries: 5,
       contention_events: 0,
@@ -74,8 +86,9 @@ app.get("/cluster/health", async (req, res) => {
   } catch (err) {
     console.warn(`[GET /cluster/health Warning]`, err.message);
     return res.json({
-      cpu_percent: 0,
-      active_queries: 0,
+      connected: false,
+      cpu_percent: null,
+      active_queries: null,
       contention_events: 0,
       replication_status: "disconnected",
       captured_at: new Date().toISOString(),
