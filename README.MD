@@ -1,6 +1,6 @@
 # CortexOps
 
-> **Autonomous, AI-Assisted Operations & Vector Semantic Decision Memory Agent for CockroachDB Clusters**
+> **AI-Assisted Operations Agent for CockroachDB Clusters, with Human-Approved Remediation and Vector-Indexed Decision History**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://golang.org)
@@ -26,7 +26,7 @@ Operating distributed databases like CockroachDB at scale requires continuous mo
 3. **Unsafe Autonomous Execution:** Traditional automated scripts lack domain guardrails and safety verification, risking catastrophic schema locks or unintended drop actions.
 
 ### The CortexOps Solution
-**CortexOps** is an autonomous, AI-assisted operations agent that continuously observes CockroachDB telemetry, diagnoses anomalies using specialized **CockroachDB Agent Skills**, formulates human-in-the-loop remediation proposals, executes them through a **strict whitelist Safety Gate**, and writes every decision's reasoning into CockroachDB using **Distributed Vector Indexing**. 
+**CortexOps** is an AI-assisted operations agent that continuously observes CockroachDB telemetry, diagnoses anomalies using specialized **CockroachDB Agent Skills**, proposes remediations for a human to approve, executes approved actions through a **whitelist-based Safety Gate**, and writes every decision's reasoning into CockroachDB using **Distributed Vector Indexing**. 
 
 Whenever an engineer asks natural-language questions (e.g. `cortexops ask "why did you scale up the cluster on Tuesday?"`), CortexOps performs semantic cosine similarity search directly against CockroachDB's vector store to provide instant, auditable answers.
 
@@ -79,7 +79,7 @@ CortexOps uses AWS services for intelligence, serverless execution, and operatio
 - **Embedding Generation:** Uses `cohere.embed-english-v3` (or `amazon.titan-embed-text-v2:0`) to generate 1024-dimension float vectors for both operational decisions and operator search queries.
 
 ### 2. AWS Lambda
-- Serverless event listener and scheduled telemetry handler (`go-agent/cmd/lambda/main.go`) that triggers autonomous health checks and anomaly evaluations.
+- Serverless event listener and scheduled telemetry handler (`go-agent/cmd/lambda/main.go`) that triggers scheduled health checks and anomaly evaluations.
 
 ### 3. Amazon CloudWatch
 - Telemetry emitter (`go-agent/monitoring/cloudwatch.go`) that exports cluster CPU usage, lock contention counters, and decision execution metrics to AWS CloudWatch for enterprise monitoring.
